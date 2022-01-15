@@ -5,3 +5,4 @@ docker/jars_dir
 docker/kafka
 *.log
 ReadMe.md
+*.iml
