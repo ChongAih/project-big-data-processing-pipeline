@@ -1,0 +1,161 @@
+version: '3'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:5.1.1
+    hostname: zookeeper
+    container_name: project_zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - pipeline_internal_system_network
+
+  broker:
+    image: confluentinc/cp-enterprise-kafka:5.1.1
+    hostname: broker
+    container_name: project_kafka_broker
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    volumes:
+      - $PWD/kafka/data:/var/lib/kafka/data/ # for ease of data inspection
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      # variable substitution to allow quick sync of configuration and setting
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_INTERNAL_SERVER},PLAINTEXT_HOST://${KAFKA_BOOTSTRAP_SERVER}
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: ${KAFKA_INTERNAL_SERVER}
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'true'
+      CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+    networks:
+      - pipeline_internal_system_network
+
+  kafka-setup:
+    image: confluentinc/cp-enterprise-kafka:5.1.1
+    container_name: project_kafka_setup
+    depends_on:
+      - broker
+    # variable substitution to allow quick sync of configuration and setting
+    environment:
+      KAFKA_INTERNAL_SERVER: ${KAFKA_INTERNAL_SERVER}
+      KAFKA_SRC_ORDER_TOPIC: ${KAFKA_SRC_ORDER_TOPIC}
+      KAFKA_DST_TXN_TOPIC: ${KAFKA_DST_TXN_TOPIC}
+      KAFKA_DST_TXN_USER_TOPIC: ${KAFKA_DST_TXN_USER_TOPIC}
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+                      cub kafka-ready -b ${KAFKA_INTERNAL_SERVER} 1 20 && \
+                      kafka-topics --create --if-not-exists --zookeeper zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_SRC_ORDER_TOPIC} && \
+                      kafka-topics --create --if-not-exists --zookeeper zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_TOPIC} && \
+                      kafka-topics --create --if-not-exists --zookeeper zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_USER_TOPIC} '"
+    networks:
+      - pipeline_internal_system_network
+
+  kafka-python:
+    image: continuumio/miniconda3:4.10.3p0-alpine
+    container_name: project_kafka_python
+    depends_on:
+      - kafka-setup
+    volumes:
+      - $PWD/../python:/python
+    environment:
+      KAFKA_INTERNAL_SERVER: ${KAFKA_INTERNAL_SERVER}
+      KAFKA_SRC_ORDER_TOPIC: ${KAFKA_SRC_ORDER_TOPIC}
+      KAFKA_DST_TXN_TOPIC: ${KAFKA_DST_TXN_TOPIC}
+      KAFKA_DST_TXN_USER_TOPIC: ${KAFKA_DST_TXN_USER_TOPIC}
+    # generate data to Kafka source topic
+    command: "bash -c 'conda env create -f python/environment.yml && \
+              conda run --no-capture-output -n big-data-processing python python/kafka_main.py'"
+    networks:
+      - pipeline_internal_system_network
+
+  spark-master:
+    image: bitnami/spark:2.4.5 # to align with what used in processing pipeline
+    hostname: spark-master
+    container_name: project_spark_master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - '8080:8080' # http://localhost:8080
+    networks:
+      - pipeline_internal_system_network
+
+  spark-worker:
+    image: bitnami/spark:2.4.5
+    container_name: project_spark_worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=${SPARK_MASTER}
+      - SPARK_WORKER_MEMORY=6G
+      - SPARK_WORKER_CORES=6
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - '8081:8081' # http://localhost:8081
+    networks:
+      - pipeline_internal_system_network
+
+  spark-submit:
+    image: bitnami/spark:2.4.5
+    hostname: ${SPARK_SUBMIT_HOSTNAME}
+    container_name: project_spark_submit
+    depends_on:
+      - spark-master
+      - spark-worker
+      - kafka-setup
+    volumes:
+      - $PWD/..:/project-data-processing-pipeline
+      - ./jars_dir:/opt/bitnami/spark/ivy:z # https://stackoverflow.com/questions/60630832/i-cannot-use-package-option-on-bitnami-spark-docker-container
+    environment:
+      SPARK_MASTER: ${SPARK_MASTER}
+      SPARK_SUBMIT_HOSTNAME: ${SPARK_SUBMIT_HOSTNAME}
+      JOB: ${JOB}
+      CONFIG_RESOURCE_PATH: ${CONFIG_RESOURCE_PATH}
+      KAFKA_START_TIME: ${KAFKA_START_TIME}
+      KAFKA_END_TIME: ${KAFKA_END_TIME}
+    ports:
+      - '8082:8082' # http://localhost:8082
+    networks:
+      - pipeline_internal_system_network
+    command: "bash -c 'cd /project-data-processing-pipeline && \
+                       spark-submit \
+                       --verbose \
+                       --master ${SPARK_MASTER} \
+                       --deploy-mode client \
+                       --driver-memory 4G \
+                       --num-executors 3 \
+                       --executor-cores 1 \
+                       --executor-memory 1G \
+                       --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+                       --files src/main/resources/log4j.properties \
+                       --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
+                       --conf spark.speculation=false \
+                       --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+                       --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+                       --conf spark.driver.bindAddress=${SPARK_SUBMIT_HOSTNAME} \
+                       --conf spark.driver.host=${SPARK_SUBMIT_HOSTNAME} \
+                       --class streaming.StreamingRunner \
+                       target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+                       --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
+                     sleep infinity'"
+
+# "bash -c 'sleep infinity'"
+
+networks:
+  pipeline_internal_system_network:
+    driver: bridge

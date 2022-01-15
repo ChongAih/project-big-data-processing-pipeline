@@ -1,0 +1,9 @@
+name: big-data-processing
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - requests
+  - influxdb
+  - kafka-python
