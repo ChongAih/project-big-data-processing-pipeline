@@ -1,9 +1,10 @@
 target
 metastore_db
 docker/data
-docker/jars_dir
+docker/jars
 .idea
 docker/kafka
 *.log
-ReadMe.md
 *.iml
+ReadMe.md
+ReadMe2.md

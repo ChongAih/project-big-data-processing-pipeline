@@ -9,29 +9,50 @@ export KAFKA_DST_TXN_USER_TOPIC="txn_user"
 export SPARK_MASTER="spark://spark-master:7077" # unify spark_master url for internal communication
 export SPARK_SUBMIT_HOSTNAME="spark-client"
 
+command="$1"
+
 # Processing job configuration
-export JOB="Txn"
-export CONFIG_RESOURCE_PATH="txn.conf"
-export KAFKA_START_TIME="-1"
-export KAFKA_END_TIME="-1"
+if [ -n "$2" ]; then
+  export JOB="$2"
+else
+  export JOB="Txn"
+fi
+if [ -n "$3" ]; then
+  export CONFIG_RESOURCE_PATH="$3"
+else
+  export CONFIG_RESOURCE_PATH="txn.conf"
+fi
+if [ -n "$4" ]; then
+  export KAFKA_START_TIME="$4"
+else
+  export KAFKA_START_TIME="-1"
+fi
+if [ -n "$5" ]; then
+  export KAFKA_END_TIME="$5"
+else
+  export KAFKA_END_TIME="-1"
+fi
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-command="$1"
-
-# sh project-runner.sh start
 if [ $command = "start" ]; then
   cd $SCRIPT_DIR/.. && mvn clean package
   cd $SCRIPT_DIR
+  echo "JOB: $JOB; CONFIG_RESOURCE_PATH: $CONFIG_RESOURCE_PATH; KAFKA_START_TIME: $KAFKA_START_TIME; KAFKA_END_TIME: $KAFKA_END_TIME"
   docker-compose -f docker-compose.yml up -d
-# sh project-runner.sh stop
 elif [ $command = "stop" ]; then
   # Spark is using external network set in Kafka, so it should be executed prior to Kafka during down
   docker-compose -f docker-compose.yml down -v
   # Clear volume bint mount directory
   KAFKA_DATA_DIR="$PWD/kafka"
   if [ -d $KAFKA_DATA_DIR ]; then rm -Rf $KAFKA_DATA_DIR; fi
+  SPARK_PACKAGE_JAR_DIR="$PWD/jars"
+  if [ -d SPARK_PACKAGE_JAR_DIR ]; then rm -Rf $SPARK_PACKAGE_JAR_DIR; fi
 else
-  echo "The input command is invalid, only 'start' or 'stop' is allowed"
+  usage="
+  Incorrect usage, please follow the following format: \
+  \n
+  sh project-runner.sh <start | stop> [optional job_name] [optional resource_path] \
+    [optional kafka_start_time] [optional kafka_end_time]"
+  echo $usage
 fi
-

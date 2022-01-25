@@ -96,6 +96,9 @@ services:
     container_name: project_spark_worker
     depends_on:
       - spark-master
+    volumes:
+      - $PWD/..:/project-data-processing-pipeline # for cluster use
+      - ./jars:/opt/bitnami/spark/ivy:z # https://stackoverflow.com/questions/60630832/i-cannot-use-package-option-on-bitnami-spark-docker-container
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=${SPARK_MASTER}
@@ -119,8 +122,8 @@ services:
       - spark-worker
       - kafka-setup
     volumes:
-      - $PWD/..:/project-data-processing-pipeline
-      - ./jars_dir:/opt/bitnami/spark/ivy:z # https://stackoverflow.com/questions/60630832/i-cannot-use-package-option-on-bitnami-spark-docker-container
+      - $PWD/..:/project-data-processing-pipeline # for client use
+      - ./jars:/opt/bitnami/spark/ivy:z # https://stackoverflow.com/questions/60630832/i-cannot-use-package-option-on-bitnami-spark-docker-container
     environment:
       SPARK_MASTER: ${SPARK_MASTER}
       SPARK_SUBMIT_HOSTNAME: ${SPARK_SUBMIT_HOSTNAME}
@@ -132,29 +135,74 @@ services:
       - '8082:8082' # http://localhost:8082
     networks:
       - pipeline_internal_system_network
-    command: "bash -c 'cd /project-data-processing-pipeline && \
-                       spark-submit \
-                       --verbose \
-                       --master ${SPARK_MASTER} \
-                       --deploy-mode client \
-                       --driver-memory 4G \
-                       --num-executors 3 \
-                       --executor-cores 1 \
-                       --executor-memory 1G \
-                       --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
-                       --files src/main/resources/log4j.properties \
-                       --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
-                       --conf spark.speculation=false \
-                       --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-                       --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-                       --conf spark.driver.bindAddress=${SPARK_SUBMIT_HOSTNAME} \
-                       --conf spark.driver.host=${SPARK_SUBMIT_HOSTNAME} \
-                       --class streaming.StreamingRunner \
-                       target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
-                       --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
-                     sleep infinity'"
+    command: "bash -c 'spark-submit \
+                --verbose \
+                --master ${SPARK_MASTER} \
+                --deploy-mode cluster \
+                --driver-memory 4G \
+                --num-executors 3 \
+                --executor-cores 1 \
+                --executor-memory 1G \
+                --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+                --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
+                --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
+                --conf spark.speculation=false \
+                --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+                --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+                --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+                --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+                --class streaming.StreamingRunner \
+                /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+                --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
+                sleep infinity'"
 
-# "bash -c 'sleep infinity'"
+    # "bash -c 'sleep infinity'"
+
+    # client
+    #    "bash -c 'cd /project-data-processing-pipeline && \
+    #                       spark-submit \
+    #                       --verbose \
+    #                       --master ${SPARK_MASTER} \
+    #                       --deploy-mode client \
+    #                       --driver-memory 4G \
+    #                       --num-executors 3 \
+    #                       --executor-cores 1 \
+    #                       --executor-memory 1G \
+    #                       --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+    #                       --files src/main/resources/log4j.properties \
+    #                       --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
+    #                       --conf spark.speculation=false \
+    #                       --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    #                       --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    #                       --conf spark.driver.bindAddress=${SPARK_SUBMIT_HOSTNAME} \
+    #                       --conf spark.driver.host=${SPARK_SUBMIT_HOSTNAME} \
+    #                       --class streaming.StreamingRunner \
+    #                       target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+    #                       --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}'"
+
+    # cluster - Include extraPath for both executor and driver since driver is now on a spark worker and it does not
+    #           know the directory where package (--packages) is saved. In cluster mode, only the application jar is
+    #           copied from client machine to worker, so the files under "--files" needs to be available in worker
+    #  "bash -c 'spark-submit \
+    #            --verbose \
+    #            --master ${SPARK_MASTER} \
+    #            --deploy-mode cluster \
+    #            --driver-memory 4G \
+    #            --num-executors 3 \
+    #            --executor-cores 1 \
+    #            --executor-memory 1G \
+    #            --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+    #            --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
+    #            --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
+    #            --conf spark.speculation=false \
+    #            --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    #            --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    #            --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+    #            --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+    #            --class streaming.StreamingRunner \
+    #            /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+    #            --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
+    #            sleep infinity'"
 
 networks:
   pipeline_internal_system_network:
