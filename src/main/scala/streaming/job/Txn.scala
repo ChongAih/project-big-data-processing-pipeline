@@ -30,14 +30,14 @@ class Txn extends Job {
        |  order_id,
        |  user_id,
        |  ${Currency2Country.name}(currency) AS country,
-       |  ${Second2MilliSecond.name}(create_time) AS event_time,
+       |  ${Second2MilliSecond.name}(create_time) AS ${getEventTimeName},
        |  ${Second2MilliSecond.name}(UNIX_TIMESTAMP(CURRENT_TIMESTAMP)) AS processing_time
        |FROM $order_table
        |WHERE order_status = 'paid'
        |""".stripMargin
   }
 
-  override def getDuplicationFieldNames: List[String] = List("country", "order_id", "event_date")
+  override def getDuplicationFieldNames: List[String] = List("country", "order_id")
 
   override def processRegisterInputTables(sparkSession: SparkSession,
                                           sourceDF: DataFrame): Unit = {
@@ -60,7 +60,7 @@ class Txn extends Job {
           }
         } catch {
           case e: Exception => {
-            logger.error(e)
+            logger.error(e) // logger info appears in executor logs
             List(Order(0, "MYR", "paid"))
           }
         }

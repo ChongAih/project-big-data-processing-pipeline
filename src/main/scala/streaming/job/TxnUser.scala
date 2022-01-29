@@ -30,7 +30,7 @@ class TxnUser extends Job {
        |    order_id,
        |    user_id,
        |    ${Currency2Country.name}(currency) AS country,
-       |    ${Second2MilliSecond.name}(create_time) AS event_time,
+       |    ${Second2MilliSecond.name}(create_time) AS ${getEventTimeName},
        |    ${Second2MilliSecond.name}(UNIX_TIMESTAMP(CURRENT_TIMESTAMP)) AS processing_time
        |  FROM $order_table
        |  WHERE order_status = 'paid'
