@@ -49,10 +49,11 @@ elif [ $command = "stop" ]; then
   SPARK_PACKAGE_JAR_DIR="$PWD/jars"
   if [ -d SPARK_PACKAGE_JAR_DIR ]; then rm -Rf $SPARK_PACKAGE_JAR_DIR; fi
 else
-  usage="
-  Incorrect usage, please follow the following format: \
-  \n
-  sh project-runner.sh <start | stop> [optional job_name] [optional resource_path] \
-    [optional kafka_start_time] [optional kafka_end_time]"
-  echo $usage
+  echo "sh project-runner.sh <start | stop> [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time]"
+  echo "<start | stop> start or stop all docker container"
+  echo "<job_name> optional processing job class name. e.g, Txn/TxnUser. Default is set to be 'Txn'"
+  echo "<resource_path> optional job configuration file name. e.g, txn.conf/txn_user.conf. Default is set to be txn.conf"
+  echo "<kafka_start_time> optional Kafka consumption start time (millisecond, second will get converted). e.g, 1643441056000. Default is set to be -1"
+  echo "<kafka_end_time> optional Kafka consumption end time (millisecond, second will get converted). e.g, 1643441056000. Default is set to be -1"
+  exit 1
 fi

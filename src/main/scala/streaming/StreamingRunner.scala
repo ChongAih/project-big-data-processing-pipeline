@@ -117,7 +117,7 @@ trait StreamingRunnerHelper {
     val kafkaSrcTopics = ConfigReader.getConfigField[String](config, "kafka.input.topic")
     val kafkaSrcServers = ConfigReader.getConfigField[String](config, "kafka.input.bootstrap_servers")
     val kafkaMaxTriggerOffset = ConfigReader.getConfigField[Long](config, "kafka.input.max_trigger_offsets")
-    val kafkaGroupId = ConfigReader.getConfigField[String](config, "kafka.input.group.id")
+    val kafkaGroupId = ConfigReader.getConfigField[String](config, "kafka.input.group.id") // Generated automatically if not given
     val aclSrc = ConfigReader.getConfigField[Boolean](config, "kafka.input.acl")
     val securityProtocol = ConfigReader.getConfigField[String](config, "kafka.common.security_protocol")
     val saslMechanism = ConfigReader.getConfigField[String](config, "kafka.common.sasl_mechanism")
