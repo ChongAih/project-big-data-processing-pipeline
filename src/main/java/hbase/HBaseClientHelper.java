@@ -7,8 +7,7 @@
 package hbase;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
@@ -53,6 +52,35 @@ public class HBaseClientHelper implements Closeable {
 
     public void closeConn() throws IOException {
         conn.close();
+    }
+
+    public void createTable(String hbaseTable, String... columnFamilies) throws IOException {
+        Admin admin = conn.getAdmin();
+        TableName tableName = TableName.valueOf(hbaseTable);
+        if (!admin.tableExists(tableName)) {
+            HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
+            for (String columnFamily : columnFamilies) {
+                tableDescriptor.addFamily(new HColumnDescriptor(columnFamily));
+            }
+            admin.createTable(tableDescriptor);
+            logger.info(String.format(
+                    "HBase response -> HBase table created. Table name: %s", hbaseTable));
+        }
+        admin.close();
+    }
+
+    public void deleteTable(String hbaseTable) throws IOException {
+        Admin admin = conn.getAdmin();
+        TableName tableName = TableName.valueOf(hbaseTable);
+        try {
+            admin.disableTable(tableName);
+        } catch (TableNotEnabledException e) {
+            logger.info(String.format(
+                    "HBase response -> HBase table (%s) has already been disabled, proceed to delete",
+                    hbaseTable));
+        }
+        admin.deleteTable(tableName);
+        admin.close();
     }
 
     public <T> Map<String, T> scan(String hbaseTable, String columnFamily,
@@ -189,6 +217,7 @@ public class HBaseClientHelper implements Closeable {
             case "short":
                 return Bytes.toBytes(new Short(writeValueString));
             case "int":
+            case "integer":
                 return Bytes.toBytes(new Integer(writeValueString));
             case "long":
                 return Bytes.toBytes(new Long(writeValueString));

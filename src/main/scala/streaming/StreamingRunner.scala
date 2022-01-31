@@ -95,9 +95,14 @@ trait StreamingRunnerHelper {
     val dstDF = spark.sql(job.getSQLText)
 
     if (local) {
+      // Access docker hbase from local IDE requires update of /etc/hosts of hosts
+      // Thus omitted when run from local IDE
       postDstDataFrameToConsole(dstDF, config)
     } else {
-      postDstDataFrameToKafka(dstDF, config)
+      postDstDataFrameToKafka(
+        job.deduplicationAndTimeFilter(dstDF, config),
+        config
+      )
     }
 
   }

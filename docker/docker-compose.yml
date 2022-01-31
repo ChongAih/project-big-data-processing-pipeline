@@ -1,5 +1,19 @@
 version: '3'
 services:
+  hbase:
+    image: dajobe/hbase
+    hostname: hbase
+    container_name: project_hbase
+    ports:
+      - "2180:2181" # client port - http://localhost:2180
+      - "16010:16010" # HMaster info web UI - http://localhost:16010
+      - "8079:8080"
+      - "8085:8085"
+      - "9090:9090"
+      - "9095:9095"
+    networks:
+      - pipeline_internal_system_network
+
   zookeeper:
     image: confluentinc/cp-zookeeper:5.1.1
     hostname: zookeeper
@@ -135,28 +149,7 @@ services:
       - '8082:8082' # http://localhost:8082
     networks:
       - pipeline_internal_system_network
-    command: "bash -c 'spark-submit \
-                --verbose \
-                --master ${SPARK_MASTER} \
-                --deploy-mode cluster \
-                --driver-memory 4G \
-                --num-executors 3 \
-                --executor-cores 1 \
-                --executor-memory 1G \
-                --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
-                --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
-                --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
-                --conf spark.speculation=false \
-                --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-                --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-                --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
-                --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
-                --class streaming.StreamingRunner \
-                /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
-                --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
-                sleep infinity'"
-
-    # "bash -c 'sleep infinity'"
+    command: "bash -c 'sleep infinity'"
 
     # client
     #    "bash -c 'cd /project-data-processing-pipeline && \

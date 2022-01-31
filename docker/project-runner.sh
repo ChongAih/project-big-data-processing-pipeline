@@ -36,13 +36,44 @@ fi
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [ $command = "start" ]; then
+  echo && echo "=========== MAVEN JAVA & SCALA JAR PACKAGING ===========" && echo
   cd $SCRIPT_DIR/.. && mvn clean package
   cd $SCRIPT_DIR
-  echo "JOB: $JOB; CONFIG_RESOURCE_PATH: $CONFIG_RESOURCE_PATH; KAFKA_START_TIME: $KAFKA_START_TIME; KAFKA_END_TIME: $KAFKA_END_TIME"
+  echo && echo "================== DOCKER COMPOSING UP ==================" && echo
+  echo "Job setting:"
+  echo "  * JOB - $JOB"
+  echo "  * CONFIG_RESOURCE_PATH - $CONFIG_RESOURCE_PATH"
+  echo "  * KAFKA_START_TIME - $KAFKA_START_TIME"
+  echo "  * KAFKA_END_TIME - $KAFKA_END_TIME"
+  echo
   docker-compose -f docker-compose.yml up -d
+  echo && echo "=================== DOCKER EXECUTING ===================" && echo
+  docker container exec project_hbase bash -c "echo \"create 'deduplication','cf'\" | hbase shell -n"
+  docker container exec project_spark_submit bash -c \
+    "spark-submit \
+    --verbose \
+    --master ${SPARK_MASTER} \
+    --deploy-mode cluster \
+    --driver-memory 4G \
+    --num-executors 3 \
+    --executor-cores 1 \
+    --executor-memory 1G \
+    --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+    --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
+    --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
+    --conf spark.speculation=false \
+    --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+    --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+    --class streaming.StreamingRunner \
+    /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+    --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
 elif [ $command = "stop" ]; then
+  echo && echo "================== DOCKER COMPOSING DOWN =================" && echo
   # Spark is using external network set in Kafka, so it should be executed prior to Kafka during down
   docker-compose -f docker-compose.yml down -v
+  echo && echo "========================= CLEANING =======================" && echo
   # Clear volume bint mount directory
   KAFKA_DATA_DIR="$PWD/kafka"
   if [ -d $KAFKA_DATA_DIR ]; then rm -Rf $KAFKA_DATA_DIR; fi
