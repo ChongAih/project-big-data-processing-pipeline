@@ -46,7 +46,7 @@ class TxnUserTest extends FunSpec with GivenWhenThen with UnitTestRunner {
       val srcDF: DataFrame = getSourceDF(value)
 
       When("processed with job's logic")
-      job.processRegisterInputTables(spark, srcDF)
+      job.processRegisterInputTables(config, spark, srcDF)
       val dstDF: DataFrame = spark.sql(job.getSQLText)
       val rdd: Row = dstDF.rdd.collect()(0)
 

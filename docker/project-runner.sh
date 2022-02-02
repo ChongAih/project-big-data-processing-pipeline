@@ -48,7 +48,16 @@ if [ $command = "start" ]; then
   echo
   docker-compose -f docker-compose.yml up -d
   echo && echo "=================== DOCKER EXECUTING ===================" && echo
+  sleep 10
+  # Create HBase table and write byte array data
   docker container exec project_hbase bash -c "echo \"create 'deduplication','cf'\" | hbase shell -n"
+  docker container exec project_hbase bash -c "echo \"create 'exchange_rate','cf'\" | hbase shell -n"
+  docker container exec project_hbase bash -c "echo \"put 'exchange_rate','ID$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.00007)\" | hbase shell -n"
+  docker container exec project_hbase bash -c "echo \"put 'exchange_rate','MY$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.24)\" | hbase shell -n"
+  docker container exec project_hbase bash -c "echo \"put 'exchange_rate','SG$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.74)\" | hbase shell -n"
+  docker container exec project_hbase bash -c "echo \"put 'exchange_rate','PH$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.02)\" | hbase shell -n"
+  docker container exec project_hbase bash -c "echo \"scan 'exchange_rate'\" | hbase shell -n"
+  # Run spark processing job in cluster mode
   docker container exec project_spark_submit bash -c \
     "spark-submit \
     --verbose \

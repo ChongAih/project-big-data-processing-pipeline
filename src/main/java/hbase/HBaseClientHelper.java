@@ -118,7 +118,7 @@ public class HBaseClientHelper implements Closeable {
                 clazz);
         logger.info(String.format(
                 "HBase response -> Read value from HBase, table: %s, rowkey: %s, column: %s:%s, value: %s",
-                hbaseTable, rowkey, columnFamily, columnQualifier, String.valueOf(resultValue)));
+                hbaseTable, rowkey, columnFamily, columnQualifier, resultValue));
         // Close table connection and return value
         closeTable();
         return resultValue;
@@ -241,6 +241,9 @@ public class HBaseClientHelper implements Closeable {
     public <T> T castByteValueToType(byte[] byteValue, Class<T> clazz) {
         String typeName = clazz.getSimpleName().toLowerCase();
         logger.info(String.format("HBase response -> The classname of targeted cast type: %s", typeName));
+        if (byteValue == null) {
+            return null;
+        }
         switch (typeName) {
             case "short":
                 return (T) new Short(Bytes.toShort(byteValue));

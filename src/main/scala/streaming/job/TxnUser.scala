@@ -6,11 +6,13 @@
  */
 package streaming.job
 
+import com.typesafe.config.Config
 import org.apache.log4j.Logger
 import org.apache.spark.sql.{DataFrame, Encoder, Encoders, SparkSession}
 import udf.{Currency2Country, Second2MilliSecond}
 import util.{Const, JacksonScalaObjectMapper, LoggerCreator}
 
+class TxnUserJacksonScalaObjectMapper extends JacksonScalaObjectMapper
 
 class TxnUser extends Job {
   @transient lazy val logger: Logger = LoggerCreator.getLogger(this.getClass.getSimpleName)
@@ -24,7 +26,7 @@ class TxnUser extends Job {
 
   override def getSQLText: String = {
     s"""
-       |WITH order AS (
+       |WITH orders AS (
        |  SELECT
        |    gmv,
        |    order_id,
@@ -41,13 +43,13 @@ class TxnUser extends Job {
        |  event_time,
        |  processing_time,
        |  CAST(DATE(FROM_UNIXTIME(event_time/1000)) AS STRING) AS event_date
-       |FROM order
+       |FROM orders
        |""".stripMargin
   }
 
   override def getDuplicationFieldNames: List[String] = List("country", "user_id", "event_date")
 
-  override def processRegisterInputTables(sparkSession: SparkSession,
+  override def processRegisterInputTables(config: Config, sparkSession: SparkSession,
                                           sourceDF: DataFrame): Unit = {
 
     // Create a customized de/serialization encoder as it is not available in spark.implicits._
@@ -79,5 +81,3 @@ class TxnUser extends Job {
   }
 
 }
-
-class TxnUserJacksonScalaObjectMapper extends JacksonScalaObjectMapper

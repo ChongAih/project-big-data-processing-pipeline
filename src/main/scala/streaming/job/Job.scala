@@ -16,7 +16,11 @@ abstract class Job extends Serializable {
 
   def getSQLText: String
 
-  def processRegisterInputTables(sparkSession: SparkSession, sourceDF: DataFrame): Unit
+  // Since the task is run in different executors,
+  // thus some initialization of object/ instance/ variables have to be done in each executor
+  def initializeSettingInExecutors(config: Config): Unit = {}
+
+  def processRegisterInputTables(config: Config, sparkSession: SparkSession, sourceDF: DataFrame): Unit
 
   final def deduplicationAndTimeFilter(df: DataFrame, config: Config): DataFrame = {
     df.filter(new EventTimeFilter(getEventTimeName))
