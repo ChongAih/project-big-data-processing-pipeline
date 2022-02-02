@@ -2,5 +2,5 @@ A project that leverages big data and containerization tools to achieve an easy-
 * Spark-Kafka Structured Streaming - a scalable stream processing engine
 * Hive - SQL-like interface to enable query on HDFS data
 * (Ongoing) Druid - a column-oriented distributed real-time analysis database 
-* (Ongoing) HBase - a non-relational distributed database for quick real-time query
+* HBase (Paired with Caffeine Cache) - a non-relational distributed database for quick real-time query
 * Docker - an application containerization platform
