@@ -6,9 +6,10 @@
  */
 package streaming.job
 
+import com.typesafe.config.Config
 import org.apache.log4j.Logger
-import org.apache.spark.sql.{DataFrame, Encoder, Encoders, SparkSession}
-import udf.{Currency2Country, Second2MilliSecond}
+import org.apache.spark.sql.{DataFrame, Encoder, Encoders, Row, SparkSession}
+import udf.{Currency2Country, ExchangeRate, Second2MilliSecond}
 import util.{Const, JacksonScalaObjectMapper, LoggerCreator}
 
 class TxnJacksonScalaObjectMapper extends JacksonScalaObjectMapper
@@ -21,25 +22,38 @@ class Txn extends Job {
   override def registerUDF(sparkSession: SparkSession): Unit = {
     sparkSession.udf.register(Currency2Country.name, Currency2Country)
     sparkSession.udf.register(Second2MilliSecond.name, Second2MilliSecond)
+    sparkSession.udf.register(ExchangeRate.name, ExchangeRate)
   }
 
   override def getSQLText: String = {
     s"""
+       |WITH orders AS (
+       |  SELECT
+       |    gmv,
+       |    order_id,
+       |    user_id,
+       |    ${Currency2Country.name}(currency) AS country,
+       |    ${Second2MilliSecond.name}(create_time) AS ${getEventTimeName},
+       |    ${Second2MilliSecond.name}(UNIX_TIMESTAMP(CURRENT_TIMESTAMP)) AS processing_time
+       |  FROM $order_table
+       |  WHERE order_status = 'paid'
+       |)
        |SELECT
-       |  gmv,
-       |  order_id,
-       |  user_id,
-       |  ${Currency2Country.name}(currency) AS country,
-       |  ${Second2MilliSecond.name}(create_time) AS event_time,
-       |  ${Second2MilliSecond.name}(UNIX_TIMESTAMP(CURRENT_TIMESTAMP)) AS processing_time
-       |FROM $order_table
-       |WHERE order_status = 'paid'
+       |  *,
+       |  gmv * ${ExchangeRate.name}(country, CAST(DATE(current_timestamp) AS STRING)) AS gmv_usd
+       |FROM orders
        |""".stripMargin
   }
 
-  override def getDuplicationFieldNames: List[String] = List("country", "order_id", "event_date")
+  override def getDuplicationFieldNames: List[String] = List("country", "order_id")
 
-  override def processRegisterInputTables(sparkSession: SparkSession,
+  // Since the task is run in different executors,
+  // thus some initialization of object/ instance/ variables has to be done in each executor
+  override def initializeSettingInExecutors(config: Config): Unit = {
+    ExchangeRate.initialize(config)
+  }
+
+  override def processRegisterInputTables(config: Config, sparkSession: SparkSession,
                                           sourceDF: DataFrame): Unit = {
 
     // Create a customized de/serialization encoder as it is not available in spark.implicits._
@@ -48,6 +62,8 @@ class Txn extends Job {
 
     // Create only a object mapper for each partition
     val df = sourceDF.mapPartitions(rows => {
+      // Initialize setting in each executor/ partition
+      initializeSettingInExecutors(config)
       val txnJacksonScalaObjectMapper = new TxnJacksonScalaObjectMapper()
       rows.flatMap(row => {
         try {
@@ -60,7 +76,7 @@ class Txn extends Job {
           }
         } catch {
           case e: Exception => {
-            logger.error(e)
+            logger.error(e) // logger info appears in executor logs
             List(Order(0, "MYR", "paid"))
           }
         }

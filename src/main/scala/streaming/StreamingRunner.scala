@@ -81,11 +81,12 @@ trait StreamingRunnerHelper {
         .newInstance()
         .asInstanceOf[Job]
     }
+
     job.registerUDF(spark)
 
     val srcDF = getKafkaSrcDataFrame(spark, config, kafkaStartTime, kafkaEndTime)
 
-    job.processRegisterInputTables(spark, srcDF)
+    job.processRegisterInputTables(config, spark, srcDF)
 
     logger.info(
       s"""Spark SQL:
@@ -95,9 +96,14 @@ trait StreamingRunnerHelper {
     val dstDF = spark.sql(job.getSQLText)
 
     if (local) {
+      // Since access docker hbase from local IDE requires update of host /etc/hosts file,
+      // the deduplication filter is omitted to avoid tampering of files on host
       postDstDataFrameToConsole(dstDF, config)
     } else {
-      postDstDataFrameToKafka(dstDF, config)
+      postDstDataFrameToKafka(
+        job.deduplicationAndTimeFilter(dstDF, config),
+        config
+      )
     }
 
   }

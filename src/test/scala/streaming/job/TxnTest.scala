@@ -46,7 +46,7 @@ class TxnTest extends FunSpec with GivenWhenThen with UnitTestRunner {
       val srcDF: DataFrame = getSourceDF(value)
 
       When("processed with job's logic")
-      job.processRegisterInputTables(spark, srcDF)
+      job.processRegisterInputTables(config, spark, srcDF)
       val dstDF: DataFrame = spark.sql(job.getSQLText)
       val rdd: Row = dstDF.rdd.collect()(0)
 
@@ -56,6 +56,7 @@ class TxnTest extends FunSpec with GivenWhenThen with UnitTestRunner {
       assert(rdd.get(2) === 659334)
       assert(rdd.get(3) === "PH")
       assert(rdd.get(4) === 1641885053000L)
+      assert(rdd.get(6) === 0.0d)
     }
 
     it("should return empty output") {
@@ -77,7 +78,7 @@ class TxnTest extends FunSpec with GivenWhenThen with UnitTestRunner {
       val srcDF: DataFrame = getSourceDF(value)
 
       When("processed with job's logic")
-      job.processRegisterInputTables(spark, srcDF)
+      job.processRegisterInputTables(config, spark, srcDF)
       val dstDF: DataFrame = spark.sql(job.getSQLText)
       val rdd: Array[Row] = dstDF.rdd.collect()
 

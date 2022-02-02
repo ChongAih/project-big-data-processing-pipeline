@@ -6,9 +6,10 @@
  */
 package streaming
 
+import com.typesafe.config.Config
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import util.Const
+import util.{ConfigReader, Const}
 
 trait UnitTestRunner {
 
@@ -16,6 +17,7 @@ trait UnitTestRunner {
     .setAppName("Unit-Test-Runner")
     .setMaster("local[6]")
   val spark: SparkSession = getSparkSession(defaultSparkConf)
+  val config: Config = ConfigReader.readConfig("config/defaults.conf")
 
   import spark.implicits._
 
