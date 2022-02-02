@@ -7,10 +7,14 @@ A project that leverages big data and containerization tools to achieve an easy-
 
 Command to start the pipeline
 ```
-cd docker && sh project-runner.sh start [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time]
+sh docker/project-runner.sh start [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time]
 ```
-
+Command to view Kafka data
+```
+docker container exec -it project_kafka_broker /bin/bash
+kafka-console-consumer --bootstrap-server broker:9092 --topic <order | txn | txn_user>
+```
 Command to stop the pipeline
 ```
-cd docker && sh project-runner.sh stop
+sh docker/project-runner.sh stop
 ```

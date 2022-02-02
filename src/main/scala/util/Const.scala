@@ -20,4 +20,5 @@ object Const {
   val CAFFEINE_EXPIRE_AFTER_ACCESS = 60
   val CAFFEINE_EXPIRE_AFTER_WRITE = 60
   val CAFFEINE_ENABLE_RECORD_STAT = true
+  val TIMEZONE = "Asia/Singapore"
 }

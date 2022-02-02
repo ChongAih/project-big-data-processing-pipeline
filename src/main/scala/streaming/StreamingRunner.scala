@@ -14,6 +14,7 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, Trigger}
 import streaming.job.Job
 import util.{ConfigReader, Const, KafkaHelper, LoggerCreator}
+import util.Const.TIMEZONE
 
 
 object StreamingRunner extends StreamingRunnerHelper {
@@ -67,6 +68,7 @@ trait StreamingRunnerHelper {
     val sparkConf = {
       val conf = new SparkConf()
       conf.set("spark.app.name", jobName)
+      conf.set("spark.sql.session.timeZone", TIMEZONE)
       if (local) {
         conf.set("spark.master", "local[6]")
         conf.set("spark.driver.bindAddress", "localhost")

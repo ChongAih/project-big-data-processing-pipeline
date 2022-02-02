@@ -18,7 +18,7 @@ object ExchangeRate extends ((String, String) => Double)
   with CaffeineCache[String, Double] with Serializable {
 
   val name = "get_exchange_rate"
-  val timezone = "Asia/Singapore"
+  val timezone: String = Const.TIMEZONE
   val columnQualifier = "exchange_rate"
   var config: Option[Config] = None
 
