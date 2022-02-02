@@ -4,3 +4,13 @@ A project that leverages big data and containerization tools to achieve an easy-
 * (Ongoing) Druid - a column-oriented distributed real-time analysis database 
 * HBase (Paired with Caffeine Cache) - a non-relational distributed database for quick real-time query
 * Docker - an application containerization platform
+
+Command to start the pipeline
+```
+cd docker && sh project-runner.sh start [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time]
+```
+
+Command to stop the pipeline
+```
+cd docker && sh project-runner.sh stop
+```
