@@ -83,7 +83,11 @@ class Txn extends Job {
       })
     })
 
-    df.createOrReplaceTempView(order_table)
+    // watermark is needed when there is a need for streaming join
+    // or time based computation (past 5 minutes order count)
+    df.selectExpr("*", "CAST(create_time AS timestamp) AS event_timestamp")
+      .withWatermark("event_timestamp", "1440 minutes")
+      .createOrReplaceTempView(order_table)
   }
 
 }

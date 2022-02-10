@@ -86,6 +86,7 @@ trait StreamingRunnerHelper {
 
     job.registerUDF(spark)
 
+    // Restart from checkpoint if exists else restart from specified offset
     val srcDF = getKafkaSrcDataFrame(spark, config, kafkaStartTime, kafkaEndTime)
 
     job.processRegisterInputTables(config, spark, srcDF)
@@ -125,7 +126,7 @@ trait StreamingRunnerHelper {
     val kafkaSrcTopics = ConfigReader.getConfigField[String](config, "kafka.input.topic")
     val kafkaSrcServers = ConfigReader.getConfigField[String](config, "kafka.input.bootstrap_servers")
     val kafkaMaxTriggerOffset = ConfigReader.getConfigField[Long](config, "kafka.input.max_trigger_offsets")
-    val kafkaGroupId = ConfigReader.getConfigField[String](config, "kafka.input.group.id") // Generated automatically if not given
+    val kafkaGroupId = ConfigReader.getConfigField[String](config, "kafka.input.group.id")
     val aclSrc = ConfigReader.getConfigField[Boolean](config, "kafka.input.acl")
     val securityProtocol = ConfigReader.getConfigField[String](config, "kafka.common.security_protocol")
     val saslMechanism = ConfigReader.getConfigField[String](config, "kafka.common.sasl_mechanism")
@@ -145,9 +146,9 @@ trait StreamingRunnerHelper {
           .read
           .format("kafka")
           .option("kafka.bootstrap.servers", kafkaSrcServers)
-          //.option("kafka.group.id", kafkaGroupId)
+          //.option("kafka.group.id", kafkaGroupId) // Generated automatically if not given
           .option("subscribe", kafkaSrcTopics)
-          .option("failOnDataLoss", "false")
+          .option("failOnDataLoss", "false") // Do not fail job even if Kafka offset has been removed
           .option("startingOffsets", startingOffsets)
           .option("endingOffsets", endingOffsets)
           .option("maxOffsetsPerTrigger", kafkaMaxTriggerOffset)
@@ -198,7 +199,7 @@ trait StreamingRunnerHelper {
     val triggerInterval = ConfigReader.getConfigField[String](config, "kafka.trigger_interval")
 
     // Create a query writer to write to kafka
-    var queryWriter: DataStreamWriter[Row] = dstDF.selectExpr("to_json(struct(*)) AS value")
+    var queryWriter: DataStreamWriter[Row] = dstDF.selectExpr("to_json(struct(*)) AS value") // serialization
       .writeStream
       .outputMode("append")
       .format("kafka")
