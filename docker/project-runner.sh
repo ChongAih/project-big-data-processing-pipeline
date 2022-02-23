@@ -75,7 +75,7 @@ if [ $command = "start" ]; then
     --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
     --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
-    --class streaming.StreamingRunner \
+    --class streaming.spark.StreamingRunner \
     /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
     --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
 elif [ $command = "stop" ]; then

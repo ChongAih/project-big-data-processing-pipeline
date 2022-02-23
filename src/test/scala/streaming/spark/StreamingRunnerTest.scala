@@ -1,10 +1,10 @@
 /* project-big-data-processing-pipeline
  *
- * Created: 15/1/22 8:27 pm
+ * Created: 10/2/22 10:59 am
  *
  * Description:
  */
-package streaming
+package streaming.spark
 
 // Test and view output when Kafka cluster is ready
 object StreamingRunnerTest extends StreamingRunnerHelper {

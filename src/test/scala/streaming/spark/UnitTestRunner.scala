@@ -1,10 +1,10 @@
 /* project-big-data-processing-pipeline
  *
- * Created: 11/1/22 3:19 pm
+ * Created: 10/2/22 11:01 am
  *
  * Description:
  */
-package streaming
+package streaming.spark
 
 import com.typesafe.config.Config
 import org.apache.spark.SparkConf
