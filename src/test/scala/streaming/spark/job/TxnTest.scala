@@ -4,12 +4,12 @@
  *
  * Description:
  */
-package streaming.job
+package streaming.spark.job
 
 import org.apache.log4j.Logger
 import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.{FunSpec, GivenWhenThen}
-import streaming.UnitTestRunner
+import streaming.spark.UnitTestRunner
 import util.LoggerCreator
 
 class TxnTest extends FunSpec with GivenWhenThen with UnitTestRunner {
@@ -19,7 +19,7 @@ class TxnTest extends FunSpec with GivenWhenThen with UnitTestRunner {
   val jobName = "Txn"
 
   val job: Job = {
-    Class.forName(s"streaming.job.$jobName")
+    Class.forName(s"streaming.spark.job.$jobName")
       .getConstructor()
       .newInstance()
       .asInstanceOf[Job]

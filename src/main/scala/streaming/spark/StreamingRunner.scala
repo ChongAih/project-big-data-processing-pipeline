@@ -4,7 +4,7 @@
  *
  * Description:
  */
-package streaming
+package streaming.spark
 
 import com.typesafe.config.Config
 import org.apache.log4j.Logger
@@ -12,7 +12,8 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery, Trigger}
-import streaming.job.Job
+import streaming.spark.job.Job
+import streaming.ArgumentParser
 import util.{ConfigReader, Const, KafkaHelper, LoggerCreator}
 import util.Const.TIMEZONE
 
@@ -78,7 +79,7 @@ trait StreamingRunnerHelper {
     val spark = getSparkSession(sparkConf)
 
     val job = {
-      Class.forName(s"streaming.job.$jobName")
+      Class.forName(s"streaming.spark.job.$jobName")
         .getConstructor()
         .newInstance()
         .asInstanceOf[Job]

@@ -2,7 +2,7 @@ from typing import List, Dict, Set
 from kafka import KafkaConsumer as Kc, TopicPartition
 from kafka.consumer.fetcher import ConsumerRecord
 from kafka.consumer.group import KafkaConsumer
-from kafka.structs import OffsetAndTimestamp
+from kafka.structs import OffsetAndTimestamp, OffsetAndMetadata
 from app.util.mylogger import MyLogger
 
 
@@ -20,44 +20,72 @@ class MyKafkaConsumer():
         self.sasl_plain_username = sasl_plain_username
         self.sasl_plain_password = sasl_plain_password
         self.auto_offset_reset = auto_offset_reset
+        self.group_id = group_id
+        self.consumer_timeout_ms = consumer_timeout_ms
 
         self.logger = MyLogger("MyKafkaConsumer")
         self.logger.info(f'Connecting to Kafka servers: {brokers} - {topic}')
         # Set default KafkaConsumer with default None group-id
-        self.client = self.get_kafka_consumer(topic, brokers, security_protocol, 
+        self.client: KafkaConsumer = self.get_kafka_consumer(topic, brokers, security_protocol, 
              sasl_mechanism, sasl_plain_username, sasl_plain_password, 
              auto_offset_reset, group_id, consumer_timeout_ms)
 
 
-    def get_kafka_consumer(self, topic, brokers, security_protocol: str = None, 
+    def get_kafka_consumer(self, topic: str, brokers, security_protocol: str = None, 
         sasl_mechanism: str = None, sasl_plain_username: str = None, 
         sasl_plain_password: str = None, auto_offset_reset: str = "latest", 
         group_id: str = None, consumer_timeout_ms: float = float("inf"), **kwargs) -> KafkaConsumer:
+        options = dict()
+        # Required manual assignment
+        if not topic:
+            if not security_protocol:
+                consumer = Kc(
+                    bootstrap_servers=brokers,
+                    enable_auto_commit=False,
+                    group_id=group_id,
+                    auto_offset_reset=auto_offset_reset,
+                    consumer_timeout_ms = consumer_timeout_ms,
+                    **kwargs
+                )
+            else:
+                consumer = Kc(
+                    bootstrap_servers=brokers,
+                    enable_auto_commit=False,
+                    group_id=group_id,
+                    auto_offset_reset=auto_offset_reset,
+                    security_protocol=security_protocol,
+                    sasl_mechanism=sasl_mechanism,
+                    sasl_plain_username=sasl_plain_username,
+                    sasl_plain_password=sasl_plain_password,
+                    consumer_timeout_ms = consumer_timeout_ms,
+                    **kwargs
+                )
         # Assign/ subscribe to topics
-        if not security_protocol:
-            consumer = Kc(
-                topic,
-                bootstrap_servers=brokers,
-                enable_auto_commit=False,
-                group_id=group_id,
-                auto_offset_reset=auto_offset_reset,
-                consumer_timeout_ms = consumer_timeout_ms,
-                **kwargs
-            )
         else:
-            consumer = Kc(
-                topic,
-                bootstrap_servers=brokers,
-                enable_auto_commit=False,
-                group_id=group_id,
-                auto_offset_reset=auto_offset_reset,
-                security_protocol=security_protocol,
-                sasl_mechanism=sasl_mechanism,
-                sasl_plain_username=sasl_plain_username,
-                sasl_plain_password=sasl_plain_password,
-                consumer_timeout_ms = consumer_timeout_ms,
-                **kwargs
-            )
+            if not security_protocol:
+                consumer = Kc(
+                    topic,
+                    bootstrap_servers=brokers,
+                    enable_auto_commit=False,
+                    group_id=group_id,
+                    auto_offset_reset=auto_offset_reset,
+                    consumer_timeout_ms = consumer_timeout_ms,
+                    **kwargs
+                )
+            else:
+                consumer = Kc(
+                    topic,
+                    bootstrap_servers=brokers,
+                    enable_auto_commit=False,
+                    group_id=group_id,
+                    auto_offset_reset=auto_offset_reset,
+                    security_protocol=security_protocol,
+                    sasl_mechanism=sasl_mechanism,
+                    sasl_plain_username=sasl_plain_username,
+                    sasl_plain_password=sasl_plain_password,
+                    consumer_timeout_ms = consumer_timeout_ms,
+                    **kwargs
+                )
         return consumer
 
 
@@ -74,7 +102,7 @@ class MyKafkaConsumer():
                 except Exception as e:
                     print(e)
         """
-        return self.seek_and_poll(offset=0, topic=topic)
+        return self.seek_and_poll(offsets=0, topic=topic)
 
 
     def seek_and_poll_from_timestamps(self, timestamp_ms: int, topic: str = None):
@@ -139,10 +167,14 @@ class MyKafkaConsumer():
         """
         topic = self.topic if not topic else topic
         values: List[str] = []
-        
+        client = self.get_kafka_consumer(None, self.brokers, self.security_protocol, 
+             self.sasl_mechanism, self.sasl_plain_username, self.sasl_plain_password, 
+             self.auto_offset_reset, self.group_id, self.consumer_timeout_ms)
+
         # Set offset for each partition of the topic
         topic_partitions: List[TopicPartition] = self.get_topic_partition(topic)
         for i, tp in enumerate(topic_partitions):
+            client.assign([tp])
             if offsets == None:
                 return values
             elif isinstance(offsets, int):
@@ -152,11 +184,11 @@ class MyKafkaConsumer():
             if offset == None: # if offset = None that means no data at time >= timestamps
                 return values
             elif offset == 0:
-                self.client.seek_to_beginning(tp)
+                client.seek_to_beginning(tp)
             else:
-                self.client.seek(tp, offset)
+                client.seek(tp, offset)
         
-        partitions: Dict[TopicPartition, ConsumerRecord] = self.client.poll(timeout_ms=5000)
+        partitions: Dict[TopicPartition, ConsumerRecord] = client.poll(timeout_ms=5000)
         if partitions:
             for p, messages in partitions.items():
                 for msg in messages:
@@ -184,14 +216,50 @@ class MyKafkaConsumer():
         topic_partitions: List[TopicPartition] = self.get_topic_partition(topic)
         self.logger.info(topic_partitions)
         offset_lag = 0
+        client = self.get_kafka_consumer(None, self.brokers, self.security_protocol, 
+            self.sasl_mechanism, self.sasl_plain_username, self.sasl_plain_password, 
+            self.auto_offset_reset, self.group_id, self.consumer_timeout_ms)
         for tp in topic_partitions:
-            highwater = self.client.highwater(tp)
+            client.assign([tp])
             last_commited_offset = self.client.committed(tp) or 0
-            offset_lag += highwater - last_commited_offset
-            self.logger.info(f"highwater: {highwater}, last_commited_offset: {last_commited_offset}")
+            client.seek_to_end(tp)
+            last_offset = client.position(tp)
+            offset_lag += last_offset - last_commited_offset
+            self.logger.info(f"last_offset: {last_offset}, last_commited_offset: {last_commited_offset}")
 
         return offset_lag
+
+
+    def get_last_committed_offset(self, topic: str = None) -> Dict[TopicPartition, int]:
+        topic = self.topic if not topic else topic
+        topic_partitions: List[TopicPartition] = self.get_topic_partition(topic)
+        last_committed_offsets = dict()
+        for tp in topic_partitions:
+            last_committed_offset = self.client.committed(tp)
+            last_committed_offsets[tp] = last_committed_offset
+        return last_committed_offsets
     
+    def get_last_offset(self, topic: str = None) -> Dict[TopicPartition, int]:
+        topic = self.topic if not topic else topic
+        # Find offset lag given the group_id
+        topic_partitions: List[TopicPartition] = self.get_topic_partition(topic)
+        last_offsets = dict()
+        for tp in topic_partitions:
+            self.client.assign([tp])
+            self.client.seek_to_end(tp)
+            last_offset = self.client.position(tp)
+            last_offsets[tp] = last_offset
+        return last_offsets
+
+    # this commits offsets only to Kafka
+    def commit(self, topic: str = None, offset: int=1):
+        topic = self.topic if not topic else topic
+        topic_partitions: List[TopicPartition] = self.get_topic_partition(topic)
+        offsets = dict()
+        for tp in topic_partitions:
+            offsets[tp] = OffsetAndMetadata(offset, None)
+        self.client.commit(offsets)
+
 
     def get_topic_partition(self, topic: str) -> List[TopicPartition]:
         tps: Set[int] = self.client.partitions_for_topic(topic)

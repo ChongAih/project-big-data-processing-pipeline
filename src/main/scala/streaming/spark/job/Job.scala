@@ -4,7 +4,7 @@
  *
  * Description:
  */
-package streaming.job
+package streaming.spark.job
 
 import com.typesafe.config.Config
 import org.apache.spark.sql.{DataFrame, SparkSession}

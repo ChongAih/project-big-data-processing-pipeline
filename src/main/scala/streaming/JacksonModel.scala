@@ -4,8 +4,7 @@
  *
  * Description:
  */
-package streaming.job
-
+package streaming
 
 case class Value(value: String = "", event: Option[Event] = None) {
   override def toString: String = {
