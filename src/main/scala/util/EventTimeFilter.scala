@@ -12,14 +12,20 @@ import util.ConversionHelper.getMilliSecond
 import java.time.ZoneId
 import java.util.{Calendar, Date}
 
-class EventTimeFilter(eventTimeFieldName: String) extends ((Row) => Boolean) with Serializable {
+class EventTimeFilter(eventTimeFieldName: String) extends (Row => Boolean) with Serializable {
 
-  val defaultTimeZone: ZoneId = ZoneId.systemDefault
+  import EventTimeFilter._
 
   override def apply(row: Row): Boolean = {
     val eventTime = getMilliSecond(row.getAs(eventTimeFieldName).toString.toLong)
     checkWithinProcessingWindow(eventTime)
   }
+
+}
+
+object EventTimeFilter {
+
+  val defaultTimeZone: ZoneId = ZoneId.systemDefault
 
   def checkWithinProcessingWindow(eventTime: Long): Boolean = {
     val cal: Calendar = Calendar.getInstance()
@@ -35,5 +41,4 @@ class EventTimeFilter(eventTimeFieldName: String) extends ((Row) => Boolean) wit
     }
     (eventTime >= todayStartTime) && (eventTime < tmrStartTime)
   }
-
 }

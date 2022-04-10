@@ -6,6 +6,12 @@
  */
 package streaming
 
+import scala.annotation.StaticAnnotation
+
+
+final class eventTimeAnnotation(isEventTime: Boolean) extends StaticAnnotation
+
+
 case class Value(value: String = "", event: Option[Event] = None) {
   override def toString: String = {
     s"{value: $value; event: $event}"
@@ -20,7 +26,7 @@ case class Event(database: String = "") {
 }
 
 
-case class Order(create_time: Long = 0L, currency: String = "",
+case class Order(@eventTimeAnnotation(isEventTime = true) create_time: Long = 0L, currency: String = "",
                  order_status: String = "", user_id: Long = 0L,
                  order_id: Long = 0L, gmv: Double = 0d) {
   override def toString: String = {
@@ -32,3 +38,28 @@ case class Order(create_time: Long = 0L, currency: String = "",
        |}""".stripMargin
   }
 }
+
+
+case class KafkaInputData(kafkaValue: String = "", kafkaTime: Long) {
+  override def toString: String = {
+    s"""
+       |{
+       |  kafkaValue: $kafkaValue,
+       |  kafkaTime: $kafkaTime
+       |}""".stripMargin
+  }
+}
+
+
+case class KafkaOutputData(eventTime: Long, kafkaValue: String = "",
+                          rowkey: String = "", hbaseRowkey: String = "")
+
+
+case class TxnOutput(gmv: Double, order_id: Long, user_id: Long,
+                     country: String, event_time: Long,
+                     processing_time: Long, gmv_usd: Double)
+
+
+case class TxnUserOutput(gmv: Double, order_id: Long, user_id: Long,
+                         country: String, event_time: Long,
+                         processing_time: Long, gmv_usd: Double)

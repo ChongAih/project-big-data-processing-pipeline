@@ -8,18 +8,19 @@ package util
 
 import org.scalatest.{FunSpec, GivenWhenThen}
 
+import util.EventTimeFilter.checkWithinProcessingWindow
+
 class EventTimeFilterTest extends FunSpec with GivenWhenThen {
 
   describe("EventTimeFilter behaviour") {
     it("should return filter data based on event time") {
       Given("an event time filter")
-      val eventTimeFilter = new EventTimeFilter("")
 
       When("tested with different event time")
 
       Then("data should be filter correctly based on event time")
-      assert(eventTimeFilter.checkWithinProcessingWindow(System.currentTimeMillis()))
-      assert(!eventTimeFilter.checkWithinProcessingWindow(System.currentTimeMillis()-(3600L*24L*1000L)))
+      assert(checkWithinProcessingWindow(System.currentTimeMillis()))
+      assert(!checkWithinProcessingWindow(System.currentTimeMillis()-(3600L*24L*1000L)))
     }
   }
 

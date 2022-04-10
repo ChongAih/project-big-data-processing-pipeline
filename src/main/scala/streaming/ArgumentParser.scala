@@ -14,7 +14,7 @@ class ArgumentParser(args: Array[String]) extends ScallopConf(args) {
   val configResourcePath: ScallopOption[String] = opt[String]()
   val kafkaStartTime: ScallopOption[String] = opt[String]()
   val kafkaEndTime: ScallopOption[String] = opt[String]()
-  val sparkLocalMaster: ScallopOption[Boolean] = opt[Boolean]()
+  val local: ScallopOption[Boolean] = opt[Boolean]()
 
   verify()
 }

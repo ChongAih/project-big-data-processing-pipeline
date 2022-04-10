@@ -18,7 +18,7 @@ class TxnJacksonScalaObjectMapper extends JacksonScalaObjectMapper
 class Txn extends Job {
   @transient lazy val logger: Logger = LoggerCreator.getLogger(this.getClass.getSimpleName)
 
-  val order_table: String = "order"
+  val order_table: String = "order_tab"
 
   override def registerUDF(sparkSession: SparkSession): Unit = {
     sparkSession.udf.register(Currency2Country.name, Currency2Country)

@@ -6,6 +6,8 @@
  */
 package util
 
+import java.util
+
 object Const {
   val FALLBACK_CONFIG_RESOURCE_PATH = "config/defaults.conf"
   val KAFKA_DEFAULT_LATEST_OFFSET = "-1"
@@ -21,4 +23,17 @@ object Const {
   val CAFFEINE_EXPIRE_AFTER_WRITE = 60
   val CAFFEINE_ENABLE_RECORD_STAT = true
   val TIMEZONE = "Asia/Singapore"
+}
+
+object FlinkTableConfigType {
+  val STRING = 1
+  val INT = 2
+  val BOOLEAN = 3
+  val mapping: util.Map[String, Int] = {
+    val temp: util.Map[String, Int] = new util.HashMap()
+    temp.put("table.exec.mini-batch.enabled", STRING)
+    temp.put("table.exec.mini-batch.allow-latency", STRING)
+    temp.put("table.exec.mini-batch.size", STRING)
+    temp
+  }
 }

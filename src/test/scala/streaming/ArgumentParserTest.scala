@@ -19,7 +19,7 @@ class ArgumentParserTest extends FunSpec with GivenWhenThen {
         "--config-resource-path", "config/test.conf",
         "--kafka-start-time", "-1",
         "--kafka-end-time", "-1",
-        "--spark-local-master"
+        "--local"
       )
 
       When("initialize an Scallop argument parser")
@@ -30,7 +30,7 @@ class ArgumentParserTest extends FunSpec with GivenWhenThen {
       assert(argumentParser.configResourcePath.getOrElse("") === "config/test.conf")
       assert(argumentParser.kafkaStartTime.getOrElse("") === "-1")
       assert(argumentParser.kafkaEndTime.getOrElse("") === "-1")
-      assert(argumentParser.sparkLocalMaster.getOrElse(false) === true)
+      assert(argumentParser.local.getOrElse(false) === true)
     }
 
   }

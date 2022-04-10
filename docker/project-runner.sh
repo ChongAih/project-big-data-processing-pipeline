@@ -57,7 +57,7 @@ if [ $command = "start" ]; then
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','SG$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.74)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','PH$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.02)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"scan 'exchange_rate'\" | hbase shell -n"
-  # Run spark processing job in cluster mode
+  # Run spark processing job in cluster mode, no ACL is setup for Kafka cluster by default
   docker container exec project_spark_submit bash -c \
     "spark-submit \
     --verbose \
@@ -68,11 +68,11 @@ if [ $command = "start" ]; then
     --executor-cores 1 \
     --executor-memory 1G \
     --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
-    --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
+    --files \"/project-data-processing-pipeline/src/main/resources/log4j.properties,/project-data-processing-pipeline/src/main/resources/kafka_jaas.conf\" \
     --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
     --conf spark.speculation=false \
-    --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-    --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
+    --conf \"spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties -Djava.security.auth.login.config=kafka_jaas.conf\" \
+    --conf \"spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties -Djava.security.auth.login.config=kafka_jaas.conf\" \
     --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     --class streaming.spark.StreamingRunner \
@@ -89,7 +89,7 @@ elif [ $command = "stop" ]; then
   SPARK_PACKAGE_JAR_DIR="$PWD/jars"
   if [ -d SPARK_PACKAGE_JAR_DIR ]; then rm -Rf $SPARK_PACKAGE_JAR_DIR; fi
 else
-  echo "sh project-runner.sh <start | stop> [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time]"
+  echo "sh project-runner.sh <start | stop> [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time] | [optional acl]"
   echo "<start | stop> start or stop all docker container"
   echo "<job_name> optional processing job class name. e.g, Txn/TxnUser. Default is set to be 'Txn'"
   echo "<resource_path> optional job configuration file name. e.g, txn.conf/txn_user.conf. Default is set to be txn.conf"

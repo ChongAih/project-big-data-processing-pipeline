@@ -48,11 +48,11 @@ trait StreamingRunnerHelper {
         .toLong
     }
     val kafkaEndTime = {
-      argumentParser.kafkaStartTime
+      argumentParser.kafkaEndTime
         .getOrElse(Const.KAFKA_DEFAULT_LATEST_OFFSET)
         .toLong
     }
-    val local = argumentParser.sparkLocalMaster.getOrElse(Const.SPARK_LOCAL_MASTER)
+    val local = argumentParser.local.getOrElse(Const.SPARK_LOCAL_MASTER)
 
     logger.info(
       s"""
@@ -127,7 +127,7 @@ trait StreamingRunnerHelper {
     val kafkaSrcTopics = ConfigReader.getConfigField[String](config, "kafka.input.topic")
     val kafkaSrcServers = ConfigReader.getConfigField[String](config, "kafka.input.bootstrap_servers")
     val kafkaMaxTriggerOffset = ConfigReader.getConfigField[Long](config, "kafka.input.max_trigger_offsets")
-    val kafkaGroupId = ConfigReader.getConfigField[String](config, "kafka.input.group.id")
+    val kafkaGroupId = ConfigReader.getConfigField[String](config, "kafka.input.group_id")
     val aclSrc = ConfigReader.getConfigField[Boolean](config, "kafka.input.acl")
     val securityProtocol = ConfigReader.getConfigField[String](config, "kafka.common.security_protocol")
     val saslMechanism = ConfigReader.getConfigField[String](config, "kafka.common.sasl_mechanism")
@@ -147,7 +147,7 @@ trait StreamingRunnerHelper {
           .read
           .format("kafka")
           .option("kafka.bootstrap.servers", kafkaSrcServers)
-          //.option("kafka.group.id", kafkaGroupId) // Generated automatically if not given
+          //.option("kafka.group_id", kafkaGroupId) // Generated automatically if not given
           .option("subscribe", kafkaSrcTopics)
           .option("failOnDataLoss", "false") // Do not fail job even if Kafka offset has been removed
           .option("startingOffsets", startingOffsets)
