@@ -170,7 +170,7 @@ services:
     #                       --conf spark.driver.bindAddress=${SPARK_SUBMIT_HOSTNAME} \
     #                       --conf spark.driver.host=${SPARK_SUBMIT_HOSTNAME} \
     #                       --class streaming.spark.StreamingRunner \
-    #                       target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+    #                       sparkpl/target/sparkpl-1.0-SNAPSHOT.jar \
     #                       --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}'"
 
     # cluster - Include extraPath for both executor and driver since driver is now on a spark worker and it does not
@@ -185,7 +185,7 @@ services:
     #            --executor-cores 1 \
     #            --executor-memory 1G \
     #            --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
-    #            --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
+    #            --files /project-data-processing-pipeline/sparkpl/src/main/resources/log4j.properties \
     #            --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
     #            --conf spark.speculation=false \
     #            --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
@@ -193,7 +193,7 @@ services:
     #            --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     #            --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     #            --class streaming.spark.StreamingRunner \
-    #            /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+    #            /project-data-processing-pipeline/sparkpl/target/sparkpl-1.0-SNAPSHOT.jar \
     #            --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
     #            sleep infinity'"
 

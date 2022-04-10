@@ -68,7 +68,7 @@ if [ $command = "start" ]; then
     --executor-cores 1 \
     --executor-memory 1G \
     --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
-    --files \"/project-data-processing-pipeline/src/main/resources/log4j.properties,/project-data-processing-pipeline/src/main/resources/kafka_jaas.conf\" \
+    --files \"/project-data-processing-pipeline/sparkpl/src/main/resources/log4j.properties,/project-data-processing-pipeline/sparkpl/src/main/resources/kafka_jaas.conf\" \
     --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
     --conf spark.speculation=false \
     --conf \"spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties -Djava.security.auth.login.config=kafka_jaas.conf\" \
@@ -76,7 +76,7 @@ if [ $command = "start" ]; then
     --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
     --class streaming.spark.StreamingRunner \
-    /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
+    /project-data-processing-pipeline/sparkpl/target/sparkpl-1.0-SNAPSHOT.jar \
     --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
 elif [ $command = "stop" ]; then
   echo && echo "================== DOCKER COMPOSING DOWN =================" && echo
