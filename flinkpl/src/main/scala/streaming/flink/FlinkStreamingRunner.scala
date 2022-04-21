@@ -27,6 +27,7 @@ import util.{ConfigReader, Const, LoggerCreator}
 
 import java.util.Properties
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 
 object FlinkStreamingRunner extends FlinkStreamingRunnerHelper {
   def main(args: Array[String]): Unit = {
@@ -93,6 +94,7 @@ class FlinkStreamingRunnerHelper extends FlinkSettingHelper {
     job.registerUDF(tenv, config)
 
     // Read Kafka stream and create temporary view from the respective processed stream output
+    // Set uid to record state/ offset of Kafka topic
     val kafkaStream: DataStream[KafkaInputData] = senv.fromSource(
       getKafkaSource(
         config.getConfig("kafka"),
@@ -102,6 +104,9 @@ class FlinkStreamingRunnerHelper extends FlinkSettingHelper {
       WatermarkStrategy.noWatermarks(),
       "input"
     )
+      .name(config.getConfig("kafka").getString("input.topic") + "_" + jobName)
+      .uid(config.getConfig("kafka").getString("input.topic") + "_" + jobName)
+
     job.createInputTempView(tenv, kafkaStream)
 
     // Run business logic SQL
@@ -110,6 +115,7 @@ class FlinkStreamingRunnerHelper extends FlinkSettingHelper {
     val outputDataStream: DataStream[KafkaOutputData] = job.deduplicationAndTimeFilter(sqlDataStream)
 
     // Write to console or sink
+    // Set uid to record state/ offset of Kafka topic
     if (local) {
       outputDataStream.print()
     } else {
@@ -119,8 +125,8 @@ class FlinkStreamingRunnerHelper extends FlinkSettingHelper {
           new KafkaProducerSerialization
         )
       )
-        .name(jobName)
-        .uid(jobName)
+        .name(config.getConfig("kafka").getString("output.topic") + "_" + jobName)
+        .uid(config.getConfig("kafka").getString("output.topic") + "_" + jobName)
     }
 
     senv.execute(jobName)
@@ -156,9 +162,9 @@ class FlinkStreamingRunnerHelper extends FlinkSettingHelper {
   }
 
   def getKafkaSource[T](kafkaConfig: Config,
-                     kafkaStartTime: Long,
-                     schema: KafkaDeserializationSchema[T],
-                     isPatternTopic: Boolean = false): KafkaSource[T] = {
+                        kafkaStartTime: Long,
+                        schema: KafkaDeserializationSchema[T],
+                        isPatternTopic: Boolean = false): KafkaSource[T] = {
     // Set common configuration
     val source = KafkaSource.builder[T]()
       .setBootstrapServers(kafkaConfig.getString("input.bootstrap_servers"))

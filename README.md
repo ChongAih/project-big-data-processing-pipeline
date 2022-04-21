@@ -22,3 +22,7 @@ Command to stop the pipeline
 ```
 sh docker/project-runner.sh stop
 ```
+User Interface
+* Spark Master - http://localhost:8080
+* Spark Worker - http://localhost:8081
+
