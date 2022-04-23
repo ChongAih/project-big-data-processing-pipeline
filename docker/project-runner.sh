@@ -11,24 +11,44 @@ export SPARK_SUBMIT_HOSTNAME="spark-client"
 
 command="$1"
 
-# Processing job configuration
 if [ -n "$2" ]; then
-  export JOB="$2"
+  pipeline="$2"
 else
-  export JOB="Txn"
+  pipeline="spark"
 fi
-if [ -n "$3" ]; then
-  export CONFIG_RESOURCE_PATH="$3"
+
+# Processing job configuration
+if [ $pipeline = "flink" ]; then
+  if [ -n "$3" ]; then
+    export JOB="$3"
+  else
+    export JOB="FlinkTxn"
+  fi
+  if [ -n "$4" ]; then
+    export CONFIG_RESOURCE_PATH="$4"
+  else
+    export CONFIG_RESOURCE_PATH="flink_txn.conf"
+  fi
 else
-  export CONFIG_RESOURCE_PATH="txn.conf"
+  if [ -n "$3" ]; then
+    export JOB="$3"
+  else
+    export JOB="Txn"
+  fi
+  if [ -n "$4" ]; then
+    export CONFIG_RESOURCE_PATH="$4"
+  else
+    export CONFIG_RESOURCE_PATH="txn.conf"
+  fi
 fi
-if [ -n "$4" ]; then
-  export KAFKA_START_TIME="$4"
+
+if [ -n "$5" ]; then
+  export KAFKA_START_TIME="$5"
 else
   export KAFKA_START_TIME="-1"
 fi
-if [ -n "$5" ]; then
-  export KAFKA_END_TIME="$5"
+if [ -n "$6" ]; then
+  export KAFKA_END_TIME="$6"
 else
   export KAFKA_END_TIME="-1"
 fi
@@ -57,27 +77,36 @@ if [ $command = "start" ]; then
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','SG$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.74)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','PH$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.02)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"scan 'exchange_rate'\" | hbase shell -n"
-  # Run spark processing job in cluster mode
-  docker container exec project_spark_submit bash -c \
-    "spark-submit \
-    --verbose \
-    --master ${SPARK_MASTER} \
-    --deploy-mode cluster \
-    --driver-memory 4G \
-    --num-executors 3 \
-    --executor-cores 1 \
-    --executor-memory 1G \
-    --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
-    --files /project-data-processing-pipeline/src/main/resources/log4j.properties \
-    --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
-    --conf spark.speculation=false \
-    --conf spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-    --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties \
-    --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
-    --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
-    --class streaming.spark.StreamingRunner \
-    /project-data-processing-pipeline/target/project-big-data-processing-pipeline-1.0-SNAPSHOT.jar \
-    --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
+  if [ $pipeline = "flink" ]; then
+    docker container exec project_flink_jobmanager bash -c \
+      "./bin/flink run \
+	    --detached \
+      --class streaming.flink.FlinkStreamingRunner \
+      /project-data-processing-pipeline/flinkpl/target/flinkpl-1.0-SNAPSHOT.jar \
+      --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
+  else
+    # Run spark processing job in cluster mode, no ACL is setup for Kafka cluster by default
+    docker container exec project_spark_submit bash -c \
+      "spark-submit \
+      --verbose \
+      --master ${SPARK_MASTER} \
+      --deploy-mode cluster \
+      --driver-memory 4G \
+      --num-executors 3 \
+      --executor-cores 1 \
+      --executor-memory 1G \
+      --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5 \
+      --files \"/project-data-processing-pipeline/sparkpl/src/main/resources/log4j.properties,/project-data-processing-pipeline/sparkpl/src/main/resources/kafka_jaas.conf\" \
+      --conf spark.jars.ivy=/opt/bitnami/spark/ivy \
+      --conf spark.speculation=false \
+      --conf \"spark.driver.extraJavaOptions=-Dlog4j.configuration=log4j.properties -Djava.security.auth.login.config=kafka_jaas.conf\" \
+      --conf \"spark.executor.extraJavaOptions=-Dlog4j.configuration=log4j.properties -Djava.security.auth.login.config=kafka_jaas.conf\" \
+      --conf spark.driver.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+      --conf spark.executor.extraClassPath=/opt/bitnami/spark/ivy/jars/* \
+      --class streaming.spark.StreamingRunner \
+      /project-data-processing-pipeline/sparkpl/target/sparkpl-1.0-SNAPSHOT.jar \
+      --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
+  fi
 elif [ $command = "stop" ]; then
   echo && echo "================== DOCKER COMPOSING DOWN =================" && echo
   # Spark is using external network set in Kafka, so it should be executed prior to Kafka during down
@@ -89,8 +118,9 @@ elif [ $command = "stop" ]; then
   SPARK_PACKAGE_JAR_DIR="$PWD/jars"
   if [ -d SPARK_PACKAGE_JAR_DIR ]; then rm -Rf $SPARK_PACKAGE_JAR_DIR; fi
 else
-  echo "sh project-runner.sh <start | stop> [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time]"
+  echo "sh project-runner.sh <start | stop> [optional processing_platform] [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time] | [optional acl]"
   echo "<start | stop> start or stop all docker container"
+  echo "<processing_platform> flink or spark. e.g, flink/spark. Default is set to be 'spark'"
   echo "<job_name> optional processing job class name. e.g, Txn/TxnUser. Default is set to be 'Txn'"
   echo "<resource_path> optional job configuration file name. e.g, txn.conf/txn_user.conf. Default is set to be txn.conf"
   echo "<kafka_start_time> optional Kafka consumption start time (millisecond, second will get converted). e.g, 1643441056000. Default is set to be -1"
