@@ -43,8 +43,12 @@ services:
       # variable substitution to allow quick sync of configuration and setting
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_INTERNAL_SERVER},PLAINTEXT_HOST://${KAFKA_BOOTSTRAP_SERVER}
       KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # since we have only 1 broker to allow successful write of Flink
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # since we have only 1 broker to allow successful write of Flink
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # since we have only 1 broker to allow successful write of Flink
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_RETENTION_HOURS: 720
+      KAFKA_TRANSACTIONAL_ID_EXPIRATION_MS: 2073600000
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: ${KAFKA_INTERNAL_SERVER}
       CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
@@ -135,6 +139,7 @@ services:
       - spark-master
       - spark-worker
       - kafka-setup
+      - hbase
     volumes:
       - $PWD/..:/project-data-processing-pipeline # for client use
       - ./jars:/opt/bitnami/spark/ivy:z # https://stackoverflow.com/questions/60630832/i-cannot-use-package-option-on-bitnami-spark-docker-container
@@ -196,6 +201,38 @@ services:
     #            /project-data-processing-pipeline/sparkpl/target/sparkpl-1.0-SNAPSHOT.jar \
     #            --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME} & \
     #            sleep infinity'"
+
+  flink-jobmanager:
+    image: flink:1.14.4-scala_2.11-java8
+    ports:
+      - "8083:8081"
+    command: jobmanager
+    container_name: project_flink_jobmanager
+    volumes:
+      - $PWD/..:/project-data-processing-pipeline
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        parallelism.default: 2
+    networks:
+      - pipeline_internal_system_network
+
+  flink-taskmanager:
+    image: flink:1.14.4-scala_2.11-java8
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    container_name: project_flink_taskmanager
+    scale: 1 # allow scaling - docker-compose scale flink-taskmanager=<N>
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 2
+    networks:
+      - pipeline_internal_system_network
 
 networks:
   pipeline_internal_system_network:

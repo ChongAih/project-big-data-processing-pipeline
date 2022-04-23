@@ -14,10 +14,9 @@ import org.apache.flink.connector.kafka.sink.{KafkaRecordSerializationSchema, Ka
 import org.apache.flink.connector.kafka.source.KafkaSource
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer
 import org.apache.flink.connector.kafka.source.reader.deserializer.KafkaRecordDeserializationSchema
-import org.apache.flink.streaming.api.scala.{createTypeInformation, DataStream, StreamExecutionEnvironment}
+import org.apache.flink.streaming.api.scala.{createTypeInformation, DataStream}
 import org.apache.flink.streaming.connectors.kafka.KafkaDeserializationSchema
-import org.apache.flink.table.api.{EnvironmentSettings, Table}
-import org.apache.flink.table.api.bridge.scala.StreamTableEnvironment
+import org.apache.flink.table.api.Table
 import org.apache.log4j.Logger
 import util.ArgumentParser
 import streaming.{KafkaInputData, KafkaOutputData}
@@ -27,15 +26,10 @@ import util.{ConfigReader, Const, LoggerCreator}
 
 import java.util.Properties
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
 
 object FlinkStreamingRunner extends FlinkStreamingRunnerHelper {
   def main(args: Array[String]): Unit = {
-    run(Array("--job", "FlinkTxn",
-      "--config-resource-path", "flink_txn.conf",
-      "--kafka-start-time", "1642157787238",
-      "--kafka-end-time", "-1",
-      "--local"))
+    run(args)
   }
 }
 
@@ -148,15 +142,20 @@ class FlinkStreamingRunnerHelper extends FlinkSettingHelper {
       .setDeliverGuarantee(deliveryGuarantee)
       .setRecordSerializer(recordSerializer)
 
-    // TODO: ACL
-//    if (kafkaConfig.hasPath("output.acl") && kafkaConfig.getBoolean("output.acl")) {
-//      val properties = new Properties()
-//      val kafkaCommonConfig = kafkaConfig.getConfig("common").entrySet().asScala
-//      kafkaCommonConfig.foreach(item => {
-//        properties.setProperty(item.getKey, item.getValue.toString)
-//      })
-//      sink.build()
-//    }
+    val properties = new Properties()
+    if (kafkaConfig.hasPath("output.acl") && kafkaConfig.getBoolean("output.acl")) {
+      val kafkaCommonConfig = kafkaConfig.getConfig("common").entrySet().asScala
+      kafkaCommonConfig.foreach(item => {
+        properties.setProperty(item.getKey, item.getValue.toString)
+      })
+    }
+    // Transaction timeout of the producer must be smaller than what set in Kafka broker
+    if (kafkaConfig.hasPath("output.transaction_timeout_ms")) {
+      properties.setProperty("transaction.timeout.ms", kafkaConfig.getString("output.transaction_timeout_ms"))
+    } else {
+      properties.setProperty("transaction.timeout.ms", "900000")
+    }
+    sink.setKafkaProducerConfig(properties)
 
     sink.build()
   }
