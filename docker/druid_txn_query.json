@@ -1,0 +1,24 @@
+{
+  "queryType": "groupBy",
+  "dataSource": "txn",
+  "intervals": ["start_time/end_time"],
+  "granularity": "hour",
+  "dimensions": ["country"],
+  "aggregations": [
+    {
+      "type": "doubleSum",
+      "name": "count",
+      "fieldName": "count"
+    },
+    {
+      "type": "doubleSum",
+      "name": "gmv",
+      "fieldName": "gmv"
+    },
+    {
+      "type": "doubleSum",
+      "name": "gmv_usd",
+      "fieldName": "gmv_usd"
+    }
+  ]
+}

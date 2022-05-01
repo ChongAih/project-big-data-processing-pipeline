@@ -1,0 +1,123 @@
+version: "3"
+
+services:
+  druid-postgres:
+    container_name: project_druid_postgres
+    hostname: postgres # To avoid hectic change of Druid components' setting
+    image: postgres:latest
+    volumes:
+      - $PWD/druid/metadata_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_USER=druid
+      - POSTGRES_DB=druid
+    networks:
+      - pipeline_internal_system_network
+
+  druid-zookeeper:
+    container_name: project_druid_zookeeper
+    hostname: zookeeper # To avoid hectic change of Druid components' setting
+    image: zookeeper:3.5
+    ports:
+      - "2182:2181"
+    environment:
+      - ZOO_MY_ID=1
+    networks:
+      - pipeline_internal_system_network
+
+  druid-coordinator:
+    image: apache/druid:0.22.1
+    container_name: project_druid_coordinator
+    volumes:
+      - $PWD/druid/druid_shared:/opt/shared
+      - $PWD/druid/coordinator_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+    ports:
+      - "8086:8081"
+    command:
+      - coordinator
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-broker:
+    image: apache/druid:0.22.1
+    container_name: project_druid_broker
+    volumes:
+      - $PWD/druid/broker_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8087:8082"
+    command:
+      - broker
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-historical:
+    image: apache/druid:0.22.1
+    container_name: project_druid_historical
+    volumes:
+      - $PWD/druid/druid_shared:/opt/shared
+      - $PWD/druid/historical_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8088:8083"
+    command:
+      - historical
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-middlemanager:
+    image: apache/druid:0.22.1
+    container_name: project_druid_middlemanager
+    volumes:
+      - $PWD/druid/druid_shared:/opt/shared
+      - $PWD/druid/middle_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8089:8091"
+      - "8100-8105:8100-8105"
+    command:
+      - middleManager
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-router:
+    image: apache/druid:0.22.1
+    container_name: project_druid_router
+    volumes:
+      - $PWD/druid/router_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8889:8888" # http://localhost:8889
+    command:
+      - router
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+networks:
+  pipeline_internal_system_network:
+    driver: bridge

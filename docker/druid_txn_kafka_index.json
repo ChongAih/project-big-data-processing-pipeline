@@ -1,0 +1,54 @@
+{
+  "type": "kafka",
+  "spec": {
+    "ioConfig": {
+      "type": "kafka",
+      "consumerProperties": {
+        "bootstrap.servers": "broker:9092"
+      },
+      "topic": "txn",
+      "inputFormat": {
+        "type": "json"
+      },
+      "lateMessageRejectionPeriod": "PT1H",
+      "useEarliestOffset": true
+    },
+    "tuningConfig": {
+      "type": "kafka",
+      "logParseExceptions": true
+    },
+    "dataSchema": {
+      "dataSource": "txn",
+      "timestampSpec": {
+        "column": "event_time",
+        "format": "millis"
+      },
+      "granularitySpec": {
+        "queryGranularity": "minute",
+        "rollup": true,
+        "segmentGranularity": "hour"
+      },
+      "metricsSpec": [
+        {
+          "name": "count",
+          "type": "count"
+        },
+        {
+          "name": "gmv",
+          "type": "doubleSum",
+          "fieldName": "gmv"
+        },
+        {
+          "name": "gmv_usd",
+          "type": "doubleSum",
+          "fieldName": "gmv_usd"
+        }
+      ],
+      "dimensionsSpec": {
+        "dimensions": [
+          "country"
+        ]
+      }
+    }
+  }
+}

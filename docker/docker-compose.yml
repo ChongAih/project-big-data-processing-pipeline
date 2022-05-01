@@ -2,6 +2,7 @@ version: '3'
 services:
   hbase:
     image: dajobe/hbase
+    init: true
     hostname: hbase
     container_name: project_hbase
     ports:
@@ -14,10 +15,11 @@ services:
     networks:
       - pipeline_internal_system_network
 
-  zookeeper:
+  kafka-zookeeper:
     image: confluentinc/cp-zookeeper:5.1.1
-    hostname: zookeeper
-    container_name: project_zookeeper
+    init: true
+    hostname: kafka-zookeeper # To differ from Druid zookeeper
+    container_name: project_kafka_zookeeper
     ports:
       - "2181:2181"
     environment:
@@ -26,19 +28,20 @@ services:
     networks:
       - pipeline_internal_system_network
 
-  broker:
+  kafka-broker:
     image: confluentinc/cp-enterprise-kafka:5.1.1
+    init: true
     hostname: broker
     container_name: project_kafka_broker
     depends_on:
-      - zookeeper
+      - kafka-zookeeper
     ports:
       - "29092:29092"
     volumes:
       - $PWD/kafka/data:/var/lib/kafka/data/ # for ease of data inspection
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ZOOKEEPER_CONNECT: 'kafka-zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       # variable substitution to allow quick sync of configuration and setting
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_INTERNAL_SERVER},PLAINTEXT_HOST://${KAFKA_BOOTSTRAP_SERVER}
@@ -50,7 +53,7 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 720
       KAFKA_TRANSACTIONAL_ID_EXPIRATION_MS: 2073600000
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: ${KAFKA_INTERNAL_SERVER}
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: kafka-zookeeper:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'true'
       CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
@@ -59,9 +62,10 @@ services:
 
   kafka-setup:
     image: confluentinc/cp-enterprise-kafka:5.1.1
+    init: true
     container_name: project_kafka_setup
     depends_on:
-      - broker
+      - kafka-broker
     # variable substitution to allow quick sync of configuration and setting
     environment:
       KAFKA_INTERNAL_SERVER: ${KAFKA_INTERNAL_SERVER}
@@ -70,14 +74,15 @@ services:
       KAFKA_DST_TXN_USER_TOPIC: ${KAFKA_DST_TXN_USER_TOPIC}
     command: "bash -c 'echo Waiting for Kafka to be ready... && \
                       cub kafka-ready -b ${KAFKA_INTERNAL_SERVER} 1 20 && \
-                      kafka-topics --create --if-not-exists --zookeeper zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_SRC_ORDER_TOPIC} && \
-                      kafka-topics --create --if-not-exists --zookeeper zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_TOPIC} && \
-                      kafka-topics --create --if-not-exists --zookeeper zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_USER_TOPIC} '"
+                      kafka-topics --create --if-not-exists --zookeeper kafka-zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_SRC_ORDER_TOPIC} && \
+                      kafka-topics --create --if-not-exists --zookeeper kafka-zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_TOPIC} && \
+                      kafka-topics --create --if-not-exists --zookeeper kafka-zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_USER_TOPIC} '"
     networks:
       - pipeline_internal_system_network
 
   kafka-python:
     image: continuumio/miniconda3:4.10.3p0-alpine
+    init: true
     container_name: project_kafka_python
     depends_on:
       - kafka-setup
@@ -96,6 +101,7 @@ services:
 
   spark-master:
     image: bitnami/spark:2.4.5 # to align with what used in processing pipeline
+    init: true
     hostname: spark-master
     container_name: project_spark_master
     environment:
@@ -111,6 +117,7 @@ services:
 
   spark-worker:
     image: bitnami/spark:2.4.5
+    init: true
     container_name: project_spark_worker
     depends_on:
       - spark-master
@@ -133,6 +140,7 @@ services:
 
   spark-submit:
     image: bitnami/spark:2.4.5
+    init: true
     hostname: ${SPARK_SUBMIT_HOSTNAME}
     container_name: project_spark_submit
     depends_on:
@@ -204,6 +212,7 @@ services:
 
   flink-jobmanager:
     image: flink:1.14.4-scala_2.11-java8
+    init: true
     ports:
       - "8083:8081"
     command: jobmanager
@@ -220,6 +229,7 @@ services:
 
   flink-taskmanager:
     image: flink:1.14.4-scala_2.11-java8
+    init: true
     depends_on:
       - flink-jobmanager
     command: taskmanager
@@ -234,6 +244,131 @@ services:
     networks:
       - pipeline_internal_system_network
 
+  druid-postgres:
+    image: postgres:latest
+    init: true
+    container_name: project_druid_postgres
+    hostname: postgres # To avoid hectic change of Druid components' setting
+    volumes:
+      - $PWD/druid/metadata_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_USER=druid
+      - POSTGRES_DB=druid
+    networks:
+      - pipeline_internal_system_network
+
+  druid-zookeeper:
+    image: zookeeper:3.5
+    init: true
+    container_name: project_druid_zookeeper
+    hostname: zookeeper # To avoid hectic change of Druid components' setting
+    ports:
+      - "2182:2181"
+    environment:
+      - ZOO_MY_ID=1
+    networks:
+      - pipeline_internal_system_network
+
+  druid-coordinator:
+    image: apache/druid:0.22.1
+    init: true
+    container_name: project_druid_coordinator
+    volumes:
+      - $PWD/druid/druid_shared:/opt/shared
+      - $PWD/druid/coordinator_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+    ports:
+      - "8086:8081"
+    command:
+      - coordinator
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-broker:
+    image: apache/druid:0.22.1
+    init: true
+    container_name: project_druid_broker
+    volumes:
+      - $PWD/druid/broker_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8087:8082"
+    command:
+      - broker
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-historical:
+    image: apache/druid:0.22.1
+    init: true
+    container_name: project_druid_historical
+    volumes:
+      - $PWD/druid/druid_shared:/opt/shared
+      - $PWD/druid/historical_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8088:8083"
+    command:
+      - historical
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-middlemanager:
+    image: apache/druid:0.22.1
+    init: true
+    container_name: project_druid_middlemanager
+    volumes:
+      - $PWD/druid/druid_shared:/opt/shared
+      - $PWD/druid/middle_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8089:8091"
+      - "8100-8105:8100-8105"
+    command:
+      - middleManager
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+  druid-router:
+    image: apache/druid:0.22.1
+    init: true
+    container_name: project_druid_router
+    volumes:
+      - $PWD/druid/router_var:/opt/druid/var
+    depends_on:
+      - druid-zookeeper
+      - druid-postgres
+      - druid-coordinator
+    ports:
+      - "8889:8888" # http://localhost:8889
+    command:
+      - router
+    env_file:
+      - druid-environment
+    networks:
+      - pipeline_internal_system_network
+
+# For containers to communicate, they have to be in the same network
 networks:
   pipeline_internal_system_network:
     driver: bridge

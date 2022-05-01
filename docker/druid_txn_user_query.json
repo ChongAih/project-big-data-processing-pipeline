@@ -1,0 +1,14 @@
+{
+  "queryType": "groupBy",
+  "dataSource": "txn_user",
+  "intervals": ["start_time/end_time"],
+  "granularity": "hour",
+  "dimensions": ["country"],
+  "aggregations": [
+    {
+      "type": "doubleSum",
+      "name": "count",
+      "fieldName": "count"
+    }
+  ]
+}

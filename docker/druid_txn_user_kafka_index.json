@@ -1,0 +1,44 @@
+{
+  "type": "kafka",
+  "spec": {
+    "ioConfig": {
+      "type": "kafka",
+      "consumerProperties": {
+        "bootstrap.servers": "broker:9092"
+      },
+      "topic": "txn_user",
+      "inputFormat": {
+        "type": "json"
+      },
+      "lateMessageRejectionPeriod": "PT1H",
+      "useEarliestOffset": true
+    },
+    "tuningConfig": {
+      "type": "kafka",
+      "logParseExceptions": true
+    },
+    "dataSchema": {
+      "dataSource": "txn_user",
+      "timestampSpec": {
+        "column": "event_time",
+        "format": "millis"
+      },
+      "granularitySpec": {
+        "queryGranularity": "minute",
+        "rollup": true,
+        "segmentGranularity": "hour"
+      },
+      "metricsSpec": [
+        {
+          "name": "count",
+          "type": "count"
+        }
+      ],
+      "dimensionsSpec": {
+        "dimensions": [
+          "country"
+        ]
+      }
+    }
+  }
+}
