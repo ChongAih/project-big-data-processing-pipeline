@@ -65,6 +65,13 @@ https://vsupalov.com/docker-build-time-env-values/#:~:text=While%20you%20can't%2
 - checkpoint:
   - docker container exec -it docker_flink-jobmanager_1 /bin/bash --> cd /tmp && ls checkpoint 
   - docker container exec -it project_spark_worker /bin/bash --> cd /tmp && ls checkpoint
+- druid:
+    - https://github.com/apache/druid/tree/0.22.1/distribution/docker
+    - https://stackoverflow.com/questions/61153689/org-apache-druid-java-util-common-ise-no-default-server-found
+- docker container with same container port:
+    - https://stackoverflow.com/questions/55192991/multiple-docker-containers-with-same-container-port-connected-to-the-same-networ#:~:text=compose%20created%20network.-,Ports%20must%20be%20unique%20per%20host%20but%20each%20service%20in,name%3E%3A%20.
+- zombie:
+    - https://stackoverflow.com/questions/49162358/docker-init-zombies-why-does-it-matter
 
 ### Spark
 
@@ -186,7 +193,7 @@ https://nightlies.apache.org/flink/flink-docs-release-1.12/dev/connectors/kafka.
   User can manually create a save point to restart from the last offset
 * known issue with kafka2.3 - https://stackoverflow.com/questions/51036351/kafka-unknown-producer-id-exception
   
-
+  ```
     When a streams application has little traffic, then it is possible that consumer purging would delete even the last 
     message sent by a producer (i.e., all the messages sent by this producer have been consumed and committed), and as a 
     result, the broker would delete that producer's ID. The next time when this producer tries to send, it will get this 
@@ -211,4 +218,10 @@ https://nightlies.apache.org/flink/flink-docs-release-1.12/dev/connectors/kafka.
       at org.apache.flink.runtime.taskmanager.Task.doRun(Task.java:766) ~[flink-dist_2.11-1.14.4.jar:1.14.4]
       at org.apache.flink.runtime.taskmanager.Task.run(Task.java:575) ~[flink-dist_2.11-1.14.4.jar:1.14.4]
       at java.lang.Thread.run(Thread.java:750) ~[?:1.8.0_322]
-      Caused by: org.apache.kafka.common.errors.UnknownProducerIdException: This exception is raised by the broker if it could not locate the producer metadata associated with the producerId in question. This could happen if, for instance, the producer's records were deleted because their retention time had elapsed. Once the last records of the producerId are removed, the producer's metadata is removed from the broker, and future appends by the producer will return this exception.  
+      Caused by: org.apache.kafka.common.errors.UnknownProducerIdException: This exception is raised by the broker if it could not locate the producer metadata associated with the producerId in question. This could happen if, for instance, the producer's records were deleted because their retention time had elapsed. Once the last records of the producerId are removed, the producer's metadata is removed from the broker, and future appends by the producer will return this exception.
+  ```
+   
+### Druid
+
+* Kafka ingestion - https://druid.apache.org/docs/latest/development/extensions-core/kafka-ingestion.html
+* Native query - https://druid.apache.org/docs/latest/querying/querying.html

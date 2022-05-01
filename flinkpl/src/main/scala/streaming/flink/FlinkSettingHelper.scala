@@ -43,7 +43,8 @@ trait FlinkSettingHelper {
   def getFlinkStreamExecutionEnv(flinkConfig: Config): StreamExecutionEnvironment = {
     val senv: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     setStateBackendConfig(senv, flinkConfig)
-    setCheckpointConfig(senv, flinkConfig)
+    // Disable checkpoint due to potential error as a result of low traffic
+    // setCheckpointConfig(senv, flinkConfig)
     setExecutionConfig(senv, flinkConfig)
     senv
   }

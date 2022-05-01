@@ -6,7 +6,7 @@ A project that leverages big data and containerization tools to achieve an easy-
 * Hive - SQL-like interface to enable query on HDFS data
 * Kafka - a distributed event streaming platform
 * HBase (Paired with Caffeine Cache) - a non-relational distributed database for quick real-time query
-* (Ongoing) Druid - a column-oriented distributed real-time analysis database
+* Druid - a column-oriented distributed real-time analysis database
 * Docker - an application containerization platform
 
 ### Command to start the pipeline
@@ -41,6 +41,9 @@ sh docker/project-runner.sh stop
 * Spark Master - http://localhost:8080
 * Spark Worker - http://localhost:8081
 * Flink Job Manager - http://localhost:8083
+* HBase Master - http://localhost:16010
+* Druid Router (For manual ingestion & SQL query) - http://localhost:8889
+* Druid Overload - http://localhost:8086
 
 ### Dependencies
 * Docker (20.10.7) - https://docs.docker.com/get-docker/
