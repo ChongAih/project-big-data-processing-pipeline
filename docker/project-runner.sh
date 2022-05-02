@@ -80,7 +80,7 @@ if [ $command = "start" ]; then
   echo
   docker-compose -f docker-compose.yml up -d
 
-  echo && echo "=================== DOCKER EXECUTING ===================" && echo
+  echo && echo "=================== DOCKER EXECUTING (MIGHT TAKE SOME TIME) ===================" && echo
 
   sleep 30
   # Create HBase table and write byte array data
