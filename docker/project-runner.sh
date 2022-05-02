@@ -53,7 +53,7 @@ else
   export KAFKA_END_TIME="-1"
 fi
 
-if [ $JOB = "Txn" ]; then
+if [ $JOB = "Txn" ] || [ $JOB = "FlinkTxn" ]; then
   DRUID_KAFKA_INDEX_JSON="$PWD/druid_txn_kafka_index.json"
   DRUID_QUERY_JSON="$PWD/druid_txn_query.json"
 else
@@ -91,6 +91,7 @@ if [ $command = "start" ]; then
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','SG$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.74)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','PH$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.02)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"scan 'exchange_rate'\" | hbase shell -n"
+  sleep 30
   if [ $pipeline = "flink" ]; then
     docker container exec project_flink_jobmanager bash -c \
       "./bin/flink run \
@@ -130,7 +131,7 @@ if [ $command = "start" ]; then
     -H 'content-type: application/json' \
     -d @$DRUID_KAFKA_INDEX_JSON
 
-  echo && echo "=================== QUERYING DRUID DATASOURCE EVERY 5 MINUTES ===================" && echo
+  echo && echo "=================== QUERYING DRUID DATASOURCE EVERY 1 MINUTE ===================" && echo
 
   while true
   do
@@ -140,7 +141,7 @@ if [ $command = "start" ]; then
       -H 'cache-control: no-cache' \
       -H 'content-type: application/json' \
       -d "$query"
-    sleep 300
+    sleep 60
   done
 
 elif [ $command = "stop" ]; then

@@ -73,7 +73,7 @@ services:
       KAFKA_DST_TXN_TOPIC: ${KAFKA_DST_TXN_TOPIC}
       KAFKA_DST_TXN_USER_TOPIC: ${KAFKA_DST_TXN_USER_TOPIC}
     command: "bash -c 'echo Waiting for Kafka to be ready... && \
-                      cub kafka-ready -b ${KAFKA_INTERNAL_SERVER} 1 20 && \
+                      cub kafka-ready -b ${KAFKA_INTERNAL_SERVER} 1 200 && \
                       kafka-topics --create --if-not-exists --zookeeper kafka-zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_SRC_ORDER_TOPIC} && \
                       kafka-topics --create --if-not-exists --zookeeper kafka-zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_TOPIC} && \
                       kafka-topics --create --if-not-exists --zookeeper kafka-zookeeper:2181 --partitions 3 --replication-factor 1 --topic ${KAFKA_DST_TXN_USER_TOPIC} '"
