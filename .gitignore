@@ -2,6 +2,7 @@ target
 metastore_db
 docker/data
 docker/jars
+docker/druid
 .idea
 docker/kafka
 *.log
