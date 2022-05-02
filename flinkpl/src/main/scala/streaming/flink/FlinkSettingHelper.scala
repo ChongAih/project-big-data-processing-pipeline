@@ -43,6 +43,7 @@ trait FlinkSettingHelper {
   def getFlinkStreamExecutionEnv(flinkConfig: Config): StreamExecutionEnvironment = {
     val senv: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     setStateBackendConfig(senv, flinkConfig)
+    // Potential error as a result of low traffic, two-phase checkpoint needed for Kafka commit
     setCheckpointConfig(senv, flinkConfig)
     setExecutionConfig(senv, flinkConfig)
     senv

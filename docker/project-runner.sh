@@ -53,13 +53,25 @@ else
   export KAFKA_END_TIME="-1"
 fi
 
+if [ $JOB = "Txn" ] || [ $JOB = "FlinkTxn" ]; then
+  DRUID_KAFKA_INDEX_JSON="$PWD/druid_txn_kafka_index.json"
+  DRUID_QUERY_JSON="$PWD/druid_txn_query.json"
+else
+  DRUID_KAFKA_INDEX_JSON="$PWD/druid_txn_user_kafka_index.json"
+  DRUID_QUERY_JSON="$PWD/druid_txn_user_query.json"
+fi
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [ $command = "start" ]; then
+
   echo && echo "=========== MAVEN JAVA & SCALA JAR PACKAGING ===========" && echo
+
   cd $SCRIPT_DIR/.. && mvn clean package
   cd $SCRIPT_DIR
+
   echo && echo "================== DOCKER COMPOSING UP ==================" && echo
+
   echo "Job setting:"
   echo "  * JOB - $JOB"
   echo "  * CONFIG_RESOURCE_PATH - $CONFIG_RESOURCE_PATH"
@@ -67,8 +79,10 @@ if [ $command = "start" ]; then
   echo "  * KAFKA_END_TIME - $KAFKA_END_TIME"
   echo
   docker-compose -f docker-compose.yml up -d
-  echo && echo "=================== DOCKER EXECUTING ===================" && echo
-  sleep 10
+
+  echo && echo "=================== DOCKER EXECUTING (MIGHT TAKE SOME TIME) ===================" && echo
+
+  sleep 30
   # Create HBase table and write byte array data
   docker container exec project_hbase bash -c "echo \"create 'deduplication','cf'\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"create 'exchange_rate','cf'\" | hbase shell -n"
@@ -77,6 +91,7 @@ if [ $command = "start" ]; then
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','SG$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.74)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"put 'exchange_rate','PH$(date '+%Y-%m-%d')','cf:exchange_rate',Bytes.toBytes(0.02)\" | hbase shell -n"
   docker container exec project_hbase bash -c "echo \"scan 'exchange_rate'\" | hbase shell -n"
+  sleep 30
   if [ $pipeline = "flink" ]; then
     docker container exec project_flink_jobmanager bash -c \
       "./bin/flink run \
@@ -107,17 +122,47 @@ if [ $command = "start" ]; then
       /project-data-processing-pipeline/sparkpl/target/sparkpl-1.0-SNAPSHOT.jar \
       --job ${JOB} --config-resource-path ${CONFIG_RESOURCE_PATH} --kafka-start-time ${KAFKA_END_TIME} --kafka-end-time ${KAFKA_END_TIME}"
   fi
+
+  echo && echo "=================== SUBMITTING KAFKA INDEXING TASK TO DRUID OVERLOAD ===================" && echo
+
+  curl -X POST \
+    http://localhost:8086/druid/indexer/v1/supervisor \
+    -H 'cache-control: no-cache' \
+    -H 'content-type: application/json' \
+    -d @$DRUID_KAFKA_INDEX_JSON
+
+  echo && echo "=================== QUERYING DRUID DATASOURCE EVERY 1 MINUTE ===================" && echo
+
+  while true
+  do
+    query=$(cat $DRUID_QUERY_JSON | sed "s/start_time/$(date +"%Y-%m-%d")T00:00:00+08:00/" | sed "s/end_time/$(date -v +1d +"%Y-%m-%d")T00:00:00+08:00/")
+    curl -X POST \
+      http://localhost:8889/druid/v2/?pretty \
+      -H 'cache-control: no-cache' \
+      -H 'content-type: application/json' \
+      -d "$query"
+    sleep 60
+  done
+
 elif [ $command = "stop" ]; then
+
   echo && echo "================== DOCKER COMPOSING DOWN =================" && echo
-  # Spark is using external network set in Kafka, so it should be executed prior to Kafka during down
+
   docker-compose -f docker-compose.yml down -v
+  docker-compose -f docker-compose.yml down -v
+
   echo && echo "========================= CLEANING =======================" && echo
-  # Clear volume bint mount directory
+
+  # Clear volume bin mount directory
   KAFKA_DATA_DIR="$PWD/kafka"
   if [ -d $KAFKA_DATA_DIR ]; then rm -Rf $KAFKA_DATA_DIR; fi
   SPARK_PACKAGE_JAR_DIR="$PWD/jars"
-  if [ -d SPARK_PACKAGE_JAR_DIR ]; then rm -Rf $SPARK_PACKAGE_JAR_DIR; fi
+  if [ -d $SPARK_PACKAGE_JAR_DIR ]; then rm -Rf $SPARK_PACKAGE_JAR_DIR; fi
+  DRUID_DATA_DIR="$PWD/druid"
+  if [ -d $DRUID_DATA_DIR ]; then rm -Rf $DRUID_DATA_DIR; fi
+
 else
+
   echo "sh project-runner.sh <start | stop> [optional processing_platform] [optional job_name] [optional resource_path] [optional kafka_start_time] [optional kafka_end_time] | [optional acl]"
   echo "<start | stop> start or stop all docker container"
   echo "<processing_platform> flink or spark. e.g, flink/spark. Default is set to be 'spark'"
@@ -126,4 +171,5 @@ else
   echo "<kafka_start_time> optional Kafka consumption start time (millisecond, second will get converted). e.g, 1643441056000. Default is set to be -1"
   echo "<kafka_end_time> optional Kafka consumption end time (millisecond, second will get converted). e.g, 1643441056000. Default is set to be -1"
   exit 1
+
 fi
